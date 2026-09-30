@@ -24,6 +24,7 @@
 - **同日再追加「逐筆交易紀錄」彙總模式**：使用者反映實務上很多匯出檔是「每筆訂單一列」而非「每位客戶一列」，看不出哪欄是「購買次數」或「最近購買日期」（因為這兩欄根本不存在，需要從交易列彙總算出）。`#csvMapModal` 因此分兩組欄位對應（`MAP_FIELD_SELECTS_CUSTOMER` 4 欄 vs `MAP_FIELD_SELECTS_TXN` 3 欄：客戶代號／交易日期／交易金額），用 radio 切換；`rowsFromTransactions()` 依客戶代號分組，購買次數＝列數、最近購買日期＝交易日期最大值、累計消費金額＝交易金額加總。`openMapModal()` 猜不到 `frequency` 欄位但猜得到 `id` 時，預設自動切換到交易模式（`defaultTxnMode`），減少使用者自己發現要切換模式的摩擦。
 - 不論哪種模式，一律跳出確認視窗讓使用者用下拉選單確認或手動調整，即時重繪前 3 位客戶的 `renderMapPreview()` 彙總後預覽，按「確認匯入」才真正寫入 `rfmState.customers`。過長的儲存格內容用 `truncateCellText()`（24字+刪節號）截斷顯示並加 `title` 屬性供 hover 查看完整內容，避免預覽表格/下拉選單被撐爆版面。
 - 兩個分頁各自 5 組快速範例（虛構情境／虛構客戶），互不影響。
+- **2026-09-30 加上搜尋／縮放／客群篩選**（使用者反映真實 Excel 匯入後筆數太多影響觀看）：客戶清單表格與客戶明細表格皆有搜尋框（`applyCustomerSearchFilter()`／`getFilteredDetailRows()`），客戶清單用「隱藏不比對的列」而非重新渲染，避免打亂 `data-idx` 對應到 `rfmState.customers` 陣列索引；顯示縮放用 CSS `zoom` 屬性（`--rfm-zoom` CSS variable，套在 `.rfm-zoomable` 的 `.table-scroll` 容器上，70%-130%，`pdrfmTableZoom` 記住設定）。**客戶明細的篩選只影響顯示，`recalcRfm()` 仍對全體 `rfmState.customers` 呼叫 `computeRfm()`**——R/F/M 十分位評分本來就要看全體客戶的相對分布才有意義，KPI／長條圖／散佈圖固定吃未篩選的 `lastRfmRows`，只有 `renderRfmDetailTable()` 吃 `getFilteredDetailRows(lastRfmRows)`；改這段時務必維持這個界線，不要把篩選後的子集拿去重算分數。
 
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）
 

@@ -135,6 +135,13 @@ table{width:100%;border-collapse:collapse;font-size:13px;}
 .btn.secondary{background:var(--panel-raised);color:var(--text);border:1px solid var(--line);}
 .btn.secondary:hover{border-color:var(--accent);}
 .field-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;}
+.filter-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px;}
+.filter-row input[type=text]{flex:1 1 200px;min-width:160px;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-sans);padding:7px 10px;font-size:13px;}
+.filter-row select{background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-sans);padding:7px 10px;font-size:13px;}
+.filter-count{font-size:12px;color:var(--text-faint);white-space:nowrap;}
+.zoom-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);white-space:nowrap;}
+.zoom-control input[type=range]{width:110px;}
+.rfm-zoomable{zoom:var(--rfm-zoom,1);}
 .field-row label{font-size:13px;color:var(--text-dim);}
 .field-row input[type=date]{
   background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-mono);
@@ -367,7 +374,16 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
         <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
         <button type="button" class="btn secondary" id="downloadCsvBtn">📥 下載目前清單（CSV）</button>
       </div>
-      <div class="table-scroll">
+      <div class="filter-row">
+        <input type="text" id="customerSearchInput" placeholder="🔍 搜尋客戶代號…">
+        <span class="filter-count" id="customerFilterCount"></span>
+        <div class="zoom-control">
+          <span>顯示縮放</span>
+          <input type="range" id="tableZoomSlider" min="70" max="130" step="10" value="100">
+          <span id="tableZoomLabel">100%</span>
+        </div>
+      </div>
+      <div class="table-scroll rfm-zoomable">
         <table class="customer-table" id="customerTable">
           <thead>
             <tr><th>客戶代號</th><th>最近購買日期</th><th>購買次數(F)</th><th>累計消費金額(M)</th><th></th></tr>
@@ -375,7 +391,7 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
           <tbody id="customerTableBody"></tbody>
         </table>
       </div>
-      <p class="hint">上傳 CSV／Excel 後會自動嘗試辨識「客戶代號／最近購買日期／購買次數／累計消費金額」四個欄位對應，並跳出確認視窗讓你檢查或手動調整，確認後才會真正匯入取代目前清單。</p>
+      <p class="hint">上傳 CSV／Excel 後會自動嘗試辨識「客戶代號／最近購買日期／購買次數／累計消費金額」四個欄位對應，並跳出確認視窗讓你檢查或手動調整，確認後才會真正匯入取代目前清單。筆數較多時可用上方搜尋框篩選、或調整顯示縮放看到更多列。</p>
     </div>
 
     <div class="card">
@@ -390,7 +406,12 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
 
     <div class="card">
       <h2>客戶明細</h2>
-      <div class="table-scroll"><table class="result-table" id="rfmDetailTable"></table></div>
+      <div class="filter-row">
+        <input type="text" id="detailSearchInput" placeholder="🔍 搜尋客戶代號…">
+        <select id="detailSegmentFilter"></select>
+        <span class="filter-count" id="detailFilterCount"></span>
+      </div>
+      <div class="table-scroll rfm-zoomable"><table class="result-table" id="rfmDetailTable"></table></div>
     </div>
 
     <div class="card" id="aiCardRfm">
@@ -984,7 +1005,25 @@ function renderCustomerTable(){
       '<td><button type="button" class="row-del-btn" data-action="del">✕</button></td>';
     tbody.appendChild(tr);
   });
+  applyCustomerSearchFilter();
 }
+// 客戶清單搜尋篩選：只隱藏不比對的列，不改動陣列索引，避免打亂編輯/刪除的 data-idx 對應
+function applyCustomerSearchFilter(){
+  var input = $("customerSearchInput"); if(!input) return;
+  var q = input.value.trim().toLowerCase();
+  var rows = $("customerTableBody").querySelectorAll("tr");
+  var visible = 0;
+  rows.forEach(function(tr){
+    var idx = parseInt(tr.dataset.idx, 10);
+    var c = rfmState.customers[idx];
+    var match = !q || (c && String(c.id||"").toLowerCase().indexOf(q) !== -1);
+    tr.style.display = match ? "" : "none";
+    if(match) visible++;
+  });
+  var countEl = $("customerFilterCount");
+  if(countEl) countEl.textContent = q ? ("顯示 " + visible + " / " + rows.length + " 筆") : "";
+}
+$("customerSearchInput") && $("customerSearchInput").addEventListener("input", applyCustomerSearchFilter);
 $("customerTableBody") && $("customerTableBody").addEventListener("input", function(e){
   var input = e.target.closest("input"); if(!input) return;
   var tr = input.closest("tr"); var idx = parseInt(tr.dataset.idx,10);
@@ -1057,15 +1096,45 @@ function renderScatterChart(rows){
     }
   });
 }
-function renderRfmDetailTable(rows){
+function renderRfmDetailTable(rows, totalCount){
   var html = '<thead><tr><th>客戶代號</th><th>最近購買日期</th><th>Recency(天)</th><th>F</th><th>M</th><th>R分</th><th>F分</th><th>M分</th><th>客群</th></tr></thead><tbody>';
-  rows.forEach(function(r){
-    html += '<tr><td>'+escapeHtml(r.id)+'</td><td>'+escapeHtml(r.lastPurchaseDate)+'</td><td>'+fmtInt(r.recencyDays)+
-      '</td><td>'+fmtInt(r.frequency)+'</td><td>'+fmtMoney(r.monetary)+'</td><td>'+r.rScore+'</td><td>'+r.fScore+'</td><td>'+r.mScore+
-      '</td><td><span class="seg-badge" style="background:'+r.segment.color+'">'+r.segment.label+'</span></td></tr>';
-  });
+  if(!rows.length){
+    html += '<tr><td colspan="9" style="color:var(--text-faint);text-align:left;">沒有符合篩選條件的客戶</td></tr>';
+  } else {
+    rows.forEach(function(r){
+      html += '<tr><td>'+escapeHtml(r.id)+'</td><td>'+escapeHtml(r.lastPurchaseDate)+'</td><td>'+fmtInt(r.recencyDays)+
+        '</td><td>'+fmtInt(r.frequency)+'</td><td>'+fmtMoney(r.monetary)+'</td><td>'+r.rScore+'</td><td>'+r.fScore+'</td><td>'+r.mScore+
+        '</td><td><span class="seg-badge" style="background:'+r.segment.color+'">'+r.segment.label+'</span></td></tr>';
+    });
+  }
   html += '</tbody>';
   $("rfmDetailTable").innerHTML = html;
+  var countEl = $("detailFilterCount");
+  if(countEl) countEl.textContent = (rows.length===totalCount) ? "" : ("顯示 " + rows.length + " / " + totalCount + " 筆");
+}
+// 篩選只影響「客戶明細」表格的顯示，客群分布 KPI／圖表仍依全體客戶計算（R/F/M 百分等級評分本來就要看全體分布才有意義）
+function getFilteredDetailRows(rows){
+  var q = ($("detailSearchInput") ? $("detailSearchInput").value : "").trim().toLowerCase();
+  var seg = $("detailSegmentFilter") ? $("detailSegmentFilter").value : "";
+  return rows.filter(function(r){
+    if(seg && r.segment.key !== seg) return false;
+    if(q && String(r.id).toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+}
+function refreshDetailTableOnly(){
+  renderRfmDetailTable(getFilteredDetailRows(lastRfmRows), lastRfmRows.length);
+}
+$("detailSearchInput") && $("detailSearchInput").addEventListener("input", refreshDetailTableOnly);
+$("detailSegmentFilter") && $("detailSegmentFilter").addEventListener("change", refreshDetailTableOnly);
+function buildDetailSegmentFilter(){
+  var sel = $("detailSegmentFilter"); if(!sel) return;
+  sel.innerHTML = '<option value="">全部客群</option>';
+  SEGMENTS.forEach(function(s){
+    var opt = document.createElement("option");
+    opt.value = s.key; opt.textContent = s.label;
+    sel.appendChild(opt);
+  });
 }
 
 var lastRfmRows = [];
@@ -1075,7 +1144,7 @@ function recalcRfm(){
   renderSegmentKpi(lastRfmRows);
   renderSegmentChart(lastRfmRows);
   renderScatterChart(lastRfmRows);
-  renderRfmDetailTable(lastRfmRows);
+  renderRfmDetailTable(getFilteredDetailRows(lastRfmRows), lastRfmRows.length);
 }
 
 /* =====================================================================
@@ -1539,6 +1608,25 @@ function printReport(html){ $("printReportRoot").innerHTML = html; window.print(
 $("pdfBtnTraffic") && $("pdfBtnTraffic").addEventListener("click", function(){ printReport(buildPrintReportTraffic()); });
 $("pdfBtnRfm") && $("pdfBtnRfm").addEventListener("click", function(){ printReport(buildPrintReportRfm()); });
 
+/* ---------- RFM 表格顯示縮放（客戶清單／客戶明細共用，筆數多時可縮小看到更多列） ---------- */
+var RFM_ZOOM_KEY = "pdrfmTableZoom";
+function applyTableZoom(pct){
+  document.documentElement.style.setProperty("--rfm-zoom", pct/100);
+  if($("tableZoomLabel")) $("tableZoomLabel").textContent = pct + "%";
+}
+function loadTableZoom(){
+  if(!$("tableZoomSlider")) return;
+  var v = parseInt(localStorage.getItem(RFM_ZOOM_KEY), 10);
+  if(isNaN(v)) v = 100;
+  $("tableZoomSlider").value = v;
+  applyTableZoom(v);
+}
+$("tableZoomSlider") && $("tableZoomSlider").addEventListener("input", function(){
+  var v = parseInt(this.value, 10);
+  applyTableZoom(v);
+  try{ localStorage.setItem(RFM_ZOOM_KEY, v); }catch(e){}
+});
+
 /* =====================================================================
    PART G：Init
    ===================================================================== */
@@ -1547,6 +1635,8 @@ initTabs();
 buildTrafficExampleUI();
 loadTrafficState();
 buildRfmExampleUI();
+buildDetailSegmentFilter();
+loadTableZoom();
 loadRfmState();
 $("rfmBaseDate").value = rfmState.baseDate;
 initAiSettings();
