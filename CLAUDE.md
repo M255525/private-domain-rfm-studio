@@ -20,7 +20,7 @@
 ## 資料流與儲存
 
 - 純前端，無後端；`localStorage` 兩個獨立 key：`pdrfmTrafficState`（方案設定）、`pdrfmRfmState`（客戶清單＋基準日）。AI 設定另存 `pdrfmApiConfig`。
-- CSV／Excel 匯入用 PapaParse + SheetJS（CDN），欄位標題比對支援中英文別名（見 `CSV_FIELD_ALIASES`）。
+- CSV／Excel 匯入用 PapaParse + SheetJS（CDN）。**2026-09-30 改為「自動辨識＋確認視窗」流程**（不再是猜不到就直接失敗）：`mapHeaders()` 先用 `CSV_FIELD_ALIASES` 精確比對表頭別名，比對不到的欄位再用 `FIELD_HEURISTICS` 關鍵字子字串猜測（刻意排除單一字母關鍵字，避免誤判）；不論猜測結果如何，一律跳出 `#csvMapModal` 讓使用者用四個下拉選單確認或手動調整，即時重繪前 3 筆 `renderMapPreview()` 預覽，按「確認匯入」才真正呼叫 `rowsFromAoaWithMap()` 寫入 `rfmState.customers`。過長的儲存格內容用 `truncateCellText()`（24字+刪節號）截斷顯示並加 `title` 屬性供 hover 查看完整內容，避免預覽表格/下拉選單被撐爆版面。
 - 兩個分頁各自 5 組快速範例（虛構情境／虛構客戶），互不影響。
 
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）
