@@ -264,6 +264,8 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
 .pr-table td:first-child,.pr-table th:first-child{text-align:left;color:#555;}
 .pr-table tr.pr-total td{border-top:2px solid #10131F;font-weight:900;padding-top:8px;}
 .pr-ai-text{font-size:.85rem;white-space:pre-wrap;background:#f2f2f8;border-radius:6px;padding:12px 14px;color:#222;}
+.pr-chart-box{background:#161A2C;border-radius:10px;padding:14px;margin-top:14px;break-inside:avoid;}
+.pr-chart-box img{width:100%;display:block;}
 .pr-footer{font-size:.72rem;color:#888;border-top:1px solid #ccc;padding-top:12px;margin-top:26px;}
 @media print{
   body > *{display:none !important;}
@@ -576,6 +578,23 @@ function renderChart(canvasId, config){
   var canvas = $(canvasId); if(!canvas) return;
   if(chartInstances[canvasId]) chartInstances[canvasId].destroy();
   chartInstances[canvasId] = new Chart(canvas.getContext("2d"), config);
+}
+// PDF報告截圖用：把純色底畫在畫布內容「後面」再輸出 dataURL，畫完馬上還原成原本透明的畫布，
+// 不影響畫面上原本的即時圖表（Chart.js canvas 預設透明，直接 toBase64Image 匯出到白底報告會看不清淺色文字）
+function chartToImageWithBg(canvasId, bgColor){
+  var chart = chartInstances[canvasId]; if(!chart) return null;
+  var canvas = chart.canvas;
+  var ctx = canvas.getContext("2d");
+  var w = canvas.width, h = canvas.height;
+  var saved = ctx.getImageData(0, 0, w, h);
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, w, h);
+  var url = canvas.toDataURL("image/png");
+  ctx.restore();
+  ctx.putImageData(saved, 0, 0);
+  return url;
 }
 var CHART_TEXT_COLOR = "#A6ACC9";
 var CHART_GRID_COLOR = "rgba(166,172,201,0.15)";
@@ -1732,7 +1751,15 @@ function buildPrintReportRfm(){
     var rows = lastRfmRows.filter(function(r){ return r.segment.key===s.key; });
     html += '<tr><td>'+s.label+'</td><td>'+rows.length+' 人</td></tr>';
   });
-  html += '</table></div>';
+  html += '</table>';
+  // 圖表沿用畫面深色主題直接截圖嵌入（軸線/圖例文字是淺色，需要深色底才看得清楚）；
+  // 深色底直接畫進 PNG 像素本身，不是靠 CSS background-color——後者預設會被瀏覽器
+  // 「列印背景圖形」選項擋掉（使用者沒勾選就會消失），<img> 內容則一定會印出來
+  var segImg = chartToImageWithBg("segmentChart", "#161A2C");
+  if(segImg) html += '<div class="pr-chart-box"><img src="'+segImg+'" alt="客群分布長條圖"></div>';
+  var scatterImg = chartToImageWithBg("scatterChart", "#161A2C");
+  if(scatterImg) html += '<div class="pr-chart-box"><img src="'+scatterImg+'" alt="客群分布散佈圖"></div>';
+  html += '</div>';
   var aiText = $("aiResultRfm").classList.contains("show") ? $("aiResultRfm").textContent : "";
   if(aiText) html += '<div class="pr-section"><h2>AI 診斷</h2><div class="pr-ai-text">'+escapeHtml(aiText)+'</div></div>';
   html += '<div class="pr-footer">本報告由「私域流量與RFM顧客價值分析工作站」產生，RFM 客群分類為業界常見框架的通用設計。</div>';
