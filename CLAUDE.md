@@ -36,4 +36,11 @@
 
 ## 授權與使用限制
 
-manual.html 明確聲明：僅供教學、課程及個人使用，禁止未經授權公開發布、販售或商業化使用。**目前無序號授權機制**（跟 `mandala-thinking`／`scamper-thinking-generator`／`where-what-how-strategy-studio` 一樣走 manual-first 無鎖定路線），是否要加序號授權或推上公開 GitHub Pages 屬於商業/發布範圍決策，改動前請先跟使用者確認。
+manual.html 明確聲明：僅供教學、課程及個人使用，禁止未經授權公開發布、販售或商業化使用。**2026-09-30 已加上序號授權，鎖定整個工具**（`#licenseGate` 全螢幕遮罩，比照 `amazon-listing-generator`／`new-product-strategy-studio` 的做法；12個月效期，即時重驗不快取，背景每20分鐘重驗一次）：
+
+- 綁定的 Google Sheet：使用者指定的既有任務追蹤表 <https://docs.google.com/spreadsheets/d/1sK0-LecMHkv628Zn2xCpqLBsL7k7htyVLeuZsj9E8jQ/edit>，固定操作獨立分頁 **「PrivateDomainRFM序號」**（`Code.gs` 的 `SHEET_NAME` 常數），不掃描該試算表裡其他分頁；分頁不存在時第一次驗證會自動建立並寫入表頭。
+- 部署方式：`clasp create --parentId <SheetID>`（不加 `--type`）→ 推送 `Code.gs` → `appsscript.json` 加 `webapp:{executeAs:"USER_DEPLOYING",access:"ANYONE_ANONYMOUS"}` → `clasp push --force` → `clasp deploy`，全程在 `.gas-deploy/`（已加入 `.gitignore`）內操作，跳過瀏覽器複製貼上。
+- `LICENSE_CHECK_URL = https://script.google.com/macros/s/AKfycby94UpWjA6XK26wQVOgm_oz0bay5r0n7TF1qWPzn3ElggtJi2ioY0eXWYtyyQLVboM-DA/exec`；Apps Script 編輯器：<https://script.google.com/d/1O_edw4CLtP-GljoZr4O7BaVRlr3mXyqyggJSREBwtcajzy1uO1qkSOXA/edit>。
+- **⚠️ 部署後尚待使用者完成一次性 OAuth 授權**（`clasp deploy` 用 API 建立部署會跳過瀏覽器部署精靈附帶的授權流程，目前開啟部署網址會看到 Google「存取遭拒」頁面，已用 curl 實測確認）——步驟見 `SETUP-授權伺服器設定.md`。完成授權前，工具首頁會永遠停留在鎖定畫面（fail-closed，符合設計預期，不是 bug）。
+- `localStorage` key：`pdrfmSerial`（不與 `pdrfmTrafficState`／`pdrfmRfmState`／`pdrfmApiConfig` 衝突）。
+- 是否要推上公開 GitHub Pages 仍是刻意保留的待確認決策（2026-09-30 使用者明確選擇「先不要，維持純本機」），跟序號授權是兩件獨立的事——序號授權已完成，公開部署與否之後再問。

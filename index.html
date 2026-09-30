@@ -160,6 +160,23 @@ textarea.ai-extra{
 .ai-badge.mode-err{background:rgba(240,87,107,.15);color:var(--bad);}
 .hint{font-size:12px;color:var(--text-faint);}
 
+/* ---------- 序號授權閘門 ---------- */
+#licenseGate{position:fixed;inset:0;background:rgba(6,7,12,.92);z-index:3500;display:flex;align-items:center;justify-content:center;padding:20px;}
+#licenseGate.hidden{display:none;}
+.gate-box{background:var(--panel-raised);border:1px solid var(--line);border-radius:14px;padding:32px;width:420px;max-width:92vw;text-align:center;}
+.gate-logo{font-size:19px;font-weight:700;margin-bottom:8px;}
+.gate-logo span{color:var(--accent);}
+.gate-desc{font-size:13px;color:var(--text-dim);margin-bottom:20px;line-height:1.7;}
+.gate-row{display:flex;gap:8px;margin-bottom:14px;}
+.gate-row input{flex:1;min-width:0;background:var(--bg-alt);border:1px solid var(--line);border-radius:8px;color:var(--text);font-family:var(--font-mono);padding:10px 12px;font-size:14px;}
+.gate-row button{flex:none;}
+.gate-status{display:block;font-size:12.5px;font-weight:600;padding:8px 10px;border-radius:8px;background:var(--bg);color:var(--text-dim);}
+.gate-status.ok{background:rgba(62,207,142,.14);color:var(--good);}
+.gate-status.bad{background:rgba(240,87,107,.12);color:var(--bad);}
+.gate-status.pending{opacity:.85;}
+.license-badge{font-family:var(--font-mono);font-size:12px;font-weight:700;padding:6px 12px;border-radius:6px;background:rgba(124,111,240,.16);color:var(--accent);white-space:nowrap;}
+.license-badge.warn{background:rgba(240,180,41,.16);color:var(--warn);}
+
 /* ---------- Marquee ---------- */
 #marqueeBar{position:fixed;top:0;left:0;right:0;height:30px;background:var(--bg-alt);border-bottom:1px solid var(--line);z-index:2100;overflow:hidden;display:none;align-items:center;}
 #marqueeBar.show{display:flex;}
@@ -218,9 +235,23 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
 
 <div id="marqueeBar"><div id="marqueeTrack"></div></div>
 
+<div id="licenseGate">
+  <div class="gate-box">
+    <div class="gate-logo">📊 <span>私域流量與RFM顧客價值分析工作站</span></div>
+    <div class="gate-desc">本工具需輸入授權序號並按「確認」驗證通過後才能使用。序號自第一次驗證起提供 12 個月使用期限。</div>
+    <div class="gate-row">
+      <input type="password" id="gateSerial" placeholder="請輸入授權序號" autocomplete="off">
+      <button type="button" class="btn secondary" id="btnGateToggle" title="顯示／隱藏序號" aria-label="顯示／隱藏序號">👁</button>
+    </div>
+    <button type="button" class="btn" id="btnGateConfirm" style="width:100%;margin-bottom:12px">確認</button>
+    <span id="gateStatus" class="gate-status pending">尚未驗證</span>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="brand"><span class="dot"></span><span>私域流量與RFM顧客價值分析工作站</span></div>
   <div class="hero-utility">
+    <span id="licenseBadge" class="license-badge" style="display:none;"></span>
     <a class="hero-util-btn" href="manual.html">📖 操作手冊</a>
     <button type="button" id="installBtn" class="hero-util-btn">📲 加入主畫面</button>
   </div>
@@ -376,7 +407,7 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
 <footer>
   <div class="wrap">
     <div class="disclaimer">
-      <strong>使用警語：</strong>本工具僅供教學與內部評估使用，所有試算結果皆為依你輸入變數推算的估計值，不是正式財務報表或專業意見，不能取代會計師、財務顧問或實際數據驗證。RFM 客群分類為業界常見框架的通用設計，並非唯一標準做法。變數設定與 API 金鑰皆只存在你的瀏覽器本機，不會上傳到任何伺服器；按下「請 AI 診斷」時，你的試算資料會直接送到你選擇的服務商官方 API。完整使用說明與創作者資料請見<a href="manual.html">操作手冊</a>。
+      <strong>使用警語：</strong>本工具僅供教學與內部評估使用，禁止未經授權公開發布、販售或商業化使用，需輸入授權序號驗證通過（12個月使用期限）才能使用整個工具。所有試算結果皆為依你輸入變數推算的估計值，不是正式財務報表或專業意見，不能取代會計師、財務顧問或實際數據驗證。RFM 客群分類為業界常見框架的通用設計，並非唯一標準做法。變數設定與 API 金鑰皆只存在你的瀏覽器本機，不會上傳到任何伺服器；按下「請 AI 診斷」時，你的試算資料會直接送到你選擇的服務商官方 API。完整使用說明與創作者資料請見<a href="manual.html">操作手冊</a>。
     </div>
     <div class="footer-row">
       <span>製作：Mark Tsai｜<a href="mailto:tsaimark@gmail.com" style="color:var(--text-faint);">tsaimark@gmail.com</a></span>
@@ -1456,6 +1487,128 @@ bindAiButton("aiDiagnoseBtnRfm", "aiResultRfm", buildDiagnosisPromptRfm);
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("service-worker.js").catch(function () {}); });
   }
+})();
+</script>
+
+<script>
+/* ================= 序號授權閘門（獨立運作；鎖定整個工具） ================= */
+(function () {
+  "use strict";
+  var LICENSE_CHECK_URL = "https://script.google.com/macros/s/AKfycby94UpWjA6XK26wQVOgm_oz0bay5r0n7TF1qWPzn3ElggtJi2ioY0eXWYtyyQLVboM-DA/exec";
+  var STORAGE_KEY = "pdrfmSerial";
+  var RECHECK_MS = 20 * 60 * 1000;
+
+  var gate = document.getElementById("licenseGate");
+  var input = document.getElementById("gateSerial");
+  var toggleBtn = document.getElementById("btnGateToggle");
+  var confirmBtn = document.getElementById("btnGateConfirm");
+  var statusEl = document.getElementById("gateStatus");
+  var badgeEl = document.getElementById("licenseBadge");
+
+  function loadSerial() { return localStorage.getItem(STORAGE_KEY) || ""; }
+  function saveSerial(s) { localStorage.setItem(STORAGE_KEY, s); }
+
+  var REASON_LABEL = {
+    missing_serial: "請輸入授權序號",
+    serial_not_found: "查無此授權序號，請確認輸入是否正確",
+    expired: "此序號已逾使用期限",
+    network_error: "無法連線授權伺服器，請檢查網路連線",
+    server_error: "授權伺服器發生錯誤，請稍後再試"
+  };
+
+  function checkLicense(serial, attempt) {
+    attempt = attempt || 1;
+    if (!LICENSE_CHECK_URL) {
+      return Promise.reject(new Error("尚未設定授權伺服器網址，請聯繫工具提供者"));
+    }
+    return fetch(LICENSE_CHECK_URL, {
+      method: "POST",
+      body: JSON.stringify({ serial: serial }),
+      signal: AbortSignal.timeout(40000)
+    }).catch(function (err) {
+      throw new Error(err.name === "TimeoutError" ? "授權伺服器回應時間較長，請稍候片刻後再試一次" : "無法連線授權伺服器，請檢查網路連線");
+    }).then(function (resp) {
+      if (!resp.ok) throw new Error("授權伺服器回應異常（" + resp.status + "）");
+      return resp.text();
+    }).then(function (text) {
+      var parsed;
+      try { parsed = JSON.parse(text); } catch (e) { parsed = null; }
+      if (!parsed || typeof parsed.valid !== "boolean") {
+        if (attempt < 3) return checkLicense(serial, attempt + 1);
+        throw new Error("授權伺服器回應異常，請稍後再試一次");
+      }
+      return parsed;
+    });
+  }
+
+  function daysLeft(license) {
+    if (!license.expiresAt) return null;
+    return Math.ceil((new Date(license.expiresAt) - new Date()) / 86400000);
+  }
+  function fmtDays(license) {
+    if (!license.expiresAt) return "";
+    var expireStr = new Date(license.expiresAt).toLocaleDateString();
+    var days = daysLeft(license);
+    return "剩餘 " + Math.max(days, 0) + " 天可用（至 " + expireStr + "）";
+  }
+  function updateBadge(license) {
+    if (!badgeEl) return;
+    var days = daysLeft(license);
+    if (days === null) { badgeEl.style.display = "none"; return; }
+    badgeEl.textContent = "🔑 剩餘 " + Math.max(days, 0) + " 天";
+    badgeEl.title = "授權序號使用期限至 " + new Date(license.expiresAt).toLocaleDateString();
+    badgeEl.className = "license-badge" + (days <= 7 ? " warn" : "");
+    badgeEl.style.display = "inline-block";
+  }
+  function unlock(license) {
+    var label = fmtDays(license) || "序號有效";
+    statusEl.className = "gate-status ok";
+    statusEl.textContent = "✓ " + label;
+    gate.classList.add("hidden");
+    updateBadge(license);
+  }
+  function lock(reasonText) {
+    statusEl.className = "gate-status bad";
+    statusEl.textContent = "✗ " + reasonText;
+    gate.classList.remove("hidden");
+    if (badgeEl) badgeEl.style.display = "none";
+  }
+  function runCheck(serial, opts) {
+    opts = opts || {};
+    if (!serial) {
+      statusEl.className = "gate-status bad";
+      statusEl.textContent = REASON_LABEL.missing_serial;
+      return Promise.resolve({ valid: false, reason: "missing_serial" });
+    }
+    if (!opts.silent) {
+      statusEl.className = "gate-status pending";
+      statusEl.textContent = "驗證中…";
+    }
+    return checkLicense(serial).then(function (license) {
+      if (license.valid) unlock(license);
+      else lock(REASON_LABEL[license.reason] || license.message || "授權序號驗證失敗");
+      return license;
+    }).catch(function (err) {
+      lock(err.message);
+      return { valid: false, reason: "network_error", message: err.message };
+    });
+  }
+
+  confirmBtn.addEventListener("click", function () {
+    var serial = input.value.trim();
+    saveSerial(serial);
+    runCheck(serial);
+  });
+  input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); confirmBtn.click(); } });
+  toggleBtn.addEventListener("click", function () { input.type = input.type === "password" ? "text" : "password"; });
+
+  input.value = loadSerial();
+  if (input.value) runCheck(input.value, { silent: true });
+
+  setInterval(function () {
+    var serial = loadSerial();
+    if (serial) runCheck(serial, { silent: true });
+  }, RECHECK_MS);
 })();
 </script>
 </body>
