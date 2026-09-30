@@ -59,4 +59,4 @@ manual.html 明確聲明：僅供教學、課程及個人使用，禁止未經�
 - `LICENSE_CHECK_URL = https://script.google.com/macros/s/AKfycby94UpWjA6XK26wQVOgm_oz0bay5r0n7TF1qWPzn3ElggtJi2ioY0eXWYtyyQLVboM-DA/exec`；Apps Script 編輯器：<https://script.google.com/d/1O_edw4CLtP-GljoZr4O7BaVRlr3mXyqyggJSREBwtcajzy1uO1qkSOXA/edit>。
 - **⚠️ 部署後尚待使用者完成一次性 OAuth 授權**（`clasp deploy` 用 API 建立部署會跳過瀏覽器部署精靈附帶的授權流程，目前開啟部署網址會看到 Google「存取遭拒」頁面，已用 curl 實測確認）——步驟見 `SETUP-授權伺服器設定.md`。完成授權前，工具首頁會永遠停留在鎖定畫面（fail-closed，符合設計預期，不是 bug）。
 - `localStorage` key：`pdrfmSerial`（不與 `pdrfmTrafficState`／`pdrfmRfmState`／`pdrfmApiConfig` 衝突）。
-- 是否要推上公開 GitHub Pages 仍是刻意保留的待確認決策（2026-09-30 使用者明確選擇「先不要，維持純本機」），跟序號授權是兩件獨立的事——序號授權已完成，公開部署與否之後再問。
+- **2026-09-30 同日稍後使用者推翻「先不要」的決定，改要求公開部署**：已建立公開 GitHub repo <https://github.com/M255525/private-domain-rfm-studio> 並用 `.github/workflows/deploy-pages.yml`（逐字比照 `amazon-listing-mix-calculator` 的版本）部署上線 <https://m255525.github.io/private-domain-rfm-studio/>（已用 curl 驗證 HTTP 200）。序號授權與公開部署是兩件獨立的事，序號授權的一次性 OAuth 授權仍待使用者完成，完成前首頁會卡在序號鎖定畫面（fail-closed，屬預期行為）。
