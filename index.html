@@ -67,6 +67,11 @@ main{max-width:1180px;margin:0 auto;padding:22px 20px 70px;}
 .card h2{font-size:16.5px;margin:0 0 4px;color:#fff;}
 .card h3{font-size:14px;margin:18px 0 8px;color:var(--text-dim);}
 .card .card-desc{font-size:13px;color:var(--text-faint);margin:0 0 14px;}
+.card-header-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.card-header-row h2{margin:0;}
+.collapsed-summary{display:none;}
+#customerListCard.collapsed #customerListBody{display:none;}
+#customerListCard.collapsed .collapsed-summary{display:block;margin-top:8px;}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;}
 
 /* ---------- Pills / examples ---------- */
@@ -370,37 +375,43 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
 
     <div class="example-row" id="rfmExampleRow"></div>
 
-    <div class="card">
-      <h2>客戶清單與基準日</h2>
-      <p class="card-desc">輸入或上傳客戶清單（客戶代號／最近購買日期／購買次數／累計消費金額），本工具會依「基準日」即時計算每位客戶的 R／F／M 分數與客群。</p>
-      <div class="field-row">
-        <label for="rfmBaseDate">基準日（計算 Recency 的比較基準）</label>
-        <input type="date" id="rfmBaseDate">
+    <div class="card" id="customerListCard">
+      <div class="card-header-row">
+        <h2>客戶清單與基準日</h2>
+        <button type="button" class="btn secondary" id="customerListToggle">▲ 收合</button>
       </div>
-      <div class="toolbar-row">
-        <button type="button" class="btn secondary" id="addCustomerBtn">＋ 新增客戶</button>
-        <button type="button" class="btn secondary" id="uploadCsvBtn">📤 上傳 CSV／Excel</button>
-        <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
-        <button type="button" class="btn secondary" id="downloadCsvBtn">📥 下載目前清單（CSV）</button>
-      </div>
-      <div class="filter-row">
-        <input type="text" id="customerSearchInput" placeholder="🔍 搜尋客戶代號…">
-        <span class="filter-count" id="customerFilterCount"></span>
-        <div class="zoom-control">
-          <span>顯示縮放</span>
-          <input type="range" id="tableZoomSlider" min="70" max="130" step="10" value="100">
-          <span id="tableZoomLabel">100%</span>
+      <p class="hint collapsed-summary" id="customerListCollapsedHint"></p>
+      <div id="customerListBody">
+        <p class="card-desc">輸入或上傳客戶清單（客戶代號／最近購買日期／購買次數／累計消費金額），本工具會依「基準日」即時計算每位客戶的 R／F／M 分數與客群。</p>
+        <div class="field-row">
+          <label for="rfmBaseDate">基準日（計算 Recency 的比較基準）</label>
+          <input type="date" id="rfmBaseDate">
         </div>
+        <div class="toolbar-row">
+          <button type="button" class="btn secondary" id="addCustomerBtn">＋ 新增客戶</button>
+          <button type="button" class="btn secondary" id="uploadCsvBtn">📤 上傳 CSV／Excel</button>
+          <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+          <button type="button" class="btn secondary" id="downloadCsvBtn">📥 下載目前清單（CSV）</button>
+        </div>
+        <div class="filter-row">
+          <input type="text" id="customerSearchInput" placeholder="🔍 搜尋客戶代號…">
+          <span class="filter-count" id="customerFilterCount"></span>
+          <div class="zoom-control">
+            <span>顯示縮放</span>
+            <input type="range" id="tableZoomSlider" min="70" max="130" step="10" value="100">
+            <span id="tableZoomLabel">100%</span>
+          </div>
+        </div>
+        <div class="table-scroll rfm-zoomable">
+          <table class="customer-table" id="customerTable">
+            <thead>
+              <tr><th>客戶代號</th><th>最近購買日期</th><th>購買次數(F)</th><th>累計消費金額(M)</th><th></th></tr>
+            </thead>
+            <tbody id="customerTableBody"></tbody>
+          </table>
+        </div>
+        <p class="hint">上傳 CSV／Excel 後會自動嘗試辨識「客戶代號／最近購買日期／購買次數／累計消費金額」四個欄位對應，並跳出確認視窗讓你檢查或手動調整，確認後才會真正匯入取代目前清單。筆數較多時可用上方搜尋框篩選、或調整顯示縮放看到更多列。</p>
       </div>
-      <div class="table-scroll rfm-zoomable">
-        <table class="customer-table" id="customerTable">
-          <thead>
-            <tr><th>客戶代號</th><th>最近購買日期</th><th>購買次數(F)</th><th>累計消費金額(M)</th><th></th></tr>
-          </thead>
-          <tbody id="customerTableBody"></tbody>
-        </table>
-      </div>
-      <p class="hint">上傳 CSV／Excel 後會自動嘗試辨識「客戶代號／最近購買日期／購買次數／累計消費金額」四個欄位對應，並跳出確認視窗讓你檢查或手動調整，確認後才會真正匯入取代目前清單。筆數較多時可用上方搜尋框篩選、或調整顯示縮放看到更多列。</p>
     </div>
 
     <div class="card">
@@ -1031,6 +1042,27 @@ function renderCustomerTable(){
     tbody.appendChild(tr);
   });
   applyCustomerSearchFilter();
+  updateCustomerListCollapsedHint();
+}
+// 客戶清單區塊收合：收合時只隱藏內容區，保留標題列與收合狀態摘要，設定記住供下次使用
+var CUSTOMER_LIST_COLLAPSE_KEY = "pdrfmCustomerListCollapsed";
+function updateCustomerListCollapsedHint(){
+  var hint = $("customerListCollapsedHint"); if(!hint) return;
+  if($("customerListCard").classList.contains("collapsed")){
+    hint.textContent = "已收合，目前共 " + rfmState.customers.length + " 筆客戶，點右上角「展開」可檢視或編輯清單。";
+  }
+}
+function setCustomerListCollapsed(collapsed){
+  $("customerListCard").classList.toggle("collapsed", collapsed);
+  $("customerListToggle").textContent = collapsed ? "▼ 展開" : "▲ 收合";
+  updateCustomerListCollapsedHint();
+  try{ localStorage.setItem(CUSTOMER_LIST_COLLAPSE_KEY, collapsed ? "1" : "0"); }catch(e){}
+}
+$("customerListToggle") && $("customerListToggle").addEventListener("click", function(){
+  setCustomerListCollapsed(!$("customerListCard").classList.contains("collapsed"));
+});
+function loadCustomerListCollapse(){
+  setCustomerListCollapsed(localStorage.getItem(CUSTOMER_LIST_COLLAPSE_KEY) === "1");
 }
 // 客戶清單搜尋篩選：只隱藏不比對的列，不改動陣列索引，避免打亂編輯/刪除的 data-idx 對應
 function applyCustomerSearchFilter(){
@@ -1713,6 +1745,7 @@ loadDetailColVisibility();
 buildDetailColToggle();
 loadTableZoom();
 loadRfmState();
+loadCustomerListCollapse();
 $("rfmBaseDate").value = rfmState.baseDate;
 initAiSettings();
 buildAiPromptUI("aiPromptRowTraffic", AI_PROMPT_PRESETS_TRAFFIC, "aiExtraTraffic");
