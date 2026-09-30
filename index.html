@@ -142,6 +142,15 @@ table{width:100%;border-collapse:collapse;font-size:13px;}
 .zoom-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);white-space:nowrap;}
 .zoom-control input[type=range]{width:110px;}
 .rfm-zoomable{zoom:var(--rfm-zoom,1);}
+.range-filter{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-dim);white-space:nowrap;}
+.range-filter input[type=number]{width:70px;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-mono);padding:6px 8px;font-size:12.5px;}
+.col-toggle{position:relative;}
+.col-toggle summary{cursor:pointer;font-size:12.5px;color:var(--text-dim);background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;padding:7px 12px;list-style:none;user-select:none;white-space:nowrap;}
+.col-toggle summary::-webkit-details-marker{display:none;}
+.col-toggle summary:hover{color:var(--text);border-color:var(--accent);}
+.col-toggle[open] summary{border-color:var(--accent);color:#fff;}
+.col-toggle-panel{position:absolute;top:calc(100% + 6px);left:0;background:var(--panel-raised);border:1px solid var(--line);border-radius:10px;padding:10px 14px;z-index:60;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.col-toggle-panel label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-dim);padding:4px 0;cursor:pointer;white-space:nowrap;}
 .field-row label{font-size:13px;color:var(--text-dim);}
 .field-row input[type=date]{
   background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-mono);
@@ -409,6 +418,22 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
       <div class="filter-row">
         <input type="text" id="detailSearchInput" placeholder="🔍 搜尋客戶代號…">
         <select id="detailSegmentFilter"></select>
+        <div class="range-filter">
+          <span>F</span>
+          <input type="number" id="detailFreqMin" placeholder="最小" min="0">
+          <span>~</span>
+          <input type="number" id="detailFreqMax" placeholder="最大" min="0">
+        </div>
+        <div class="range-filter">
+          <span>M</span>
+          <input type="number" id="detailMonMin" placeholder="最小" min="0">
+          <span>~</span>
+          <input type="number" id="detailMonMax" placeholder="最大" min="0">
+        </div>
+        <details class="col-toggle">
+          <summary>⚙ 顯示欄位</summary>
+          <div class="col-toggle-panel" id="detailColToggle"></div>
+        </details>
         <span class="filter-count" id="detailFilterCount"></span>
       </div>
       <div class="table-scroll rfm-zoomable"><table class="result-table" id="rfmDetailTable"></table></div>
@@ -1096,15 +1121,53 @@ function renderScatterChart(rows){
     }
   });
 }
+// 客戶明細表格可選欄位（客戶代號／客群固定顯示，其餘可透過「⚙ 顯示欄位」勾選隱藏，避免欄位太多太寬）
+var DETAIL_COLUMNS = [
+  { key:"lastPurchaseDate", label:"最近購買日期", render:function(r){ return escapeHtml(r.lastPurchaseDate); } },
+  { key:"recencyDays", label:"Recency(天)", render:function(r){ return fmtInt(r.recencyDays); } },
+  { key:"frequency", label:"F", render:function(r){ return fmtInt(r.frequency); } },
+  { key:"monetary", label:"M", render:function(r){ return fmtMoney(r.monetary); } },
+  { key:"rScore", label:"R分", render:function(r){ return r.rScore; } },
+  { key:"fScore", label:"F分", render:function(r){ return r.fScore; } },
+  { key:"mScore", label:"M分", render:function(r){ return r.mScore; } }
+];
+var DETAIL_COL_KEY = "pdrfmDetailColumns";
+var detailColVisible = {};
+function loadDetailColVisibility(){
+  var saved = {};
+  try{ saved = JSON.parse(localStorage.getItem(DETAIL_COL_KEY) || "{}"); }catch(e){}
+  DETAIL_COLUMNS.forEach(function(c){ detailColVisible[c.key] = saved[c.key] !== false; });
+}
+function saveDetailColVisibility(){
+  try{ localStorage.setItem(DETAIL_COL_KEY, JSON.stringify(detailColVisible)); }catch(e){}
+}
+function buildDetailColToggle(){
+  var panel = $("detailColToggle"); if(!panel) return;
+  panel.innerHTML = "";
+  DETAIL_COLUMNS.forEach(function(c){
+    var label = document.createElement("label");
+    var cb = document.createElement("input");
+    cb.type = "checkbox"; cb.dataset.col = c.key; cb.checked = detailColVisible[c.key] !== false;
+    cb.addEventListener("change", function(){
+      detailColVisible[c.key] = cb.checked;
+      saveDetailColVisibility();
+      refreshDetailTableOnly();
+    });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(" " + c.label));
+    panel.appendChild(label);
+  });
+}
 function renderRfmDetailTable(rows, totalCount){
-  var html = '<thead><tr><th>客戶代號</th><th>最近購買日期</th><th>Recency(天)</th><th>F</th><th>M</th><th>R分</th><th>F分</th><th>M分</th><th>客群</th></tr></thead><tbody>';
+  var cols = DETAIL_COLUMNS.filter(function(c){ return detailColVisible[c.key] !== false; });
+  var html = '<thead><tr><th>客戶代號</th>' + cols.map(function(c){ return "<th>"+c.label+"</th>"; }).join("") + '<th>客群</th></tr></thead><tbody>';
   if(!rows.length){
-    html += '<tr><td colspan="9" style="color:var(--text-faint);text-align:left;">沒有符合篩選條件的客戶</td></tr>';
+    html += '<tr><td colspan="'+(cols.length+2)+'" style="color:var(--text-faint);text-align:left;">沒有符合篩選條件的客戶</td></tr>';
   } else {
     rows.forEach(function(r){
-      html += '<tr><td>'+escapeHtml(r.id)+'</td><td>'+escapeHtml(r.lastPurchaseDate)+'</td><td>'+fmtInt(r.recencyDays)+
-        '</td><td>'+fmtInt(r.frequency)+'</td><td>'+fmtMoney(r.monetary)+'</td><td>'+r.rScore+'</td><td>'+r.fScore+'</td><td>'+r.mScore+
-        '</td><td><span class="seg-badge" style="background:'+r.segment.color+'">'+r.segment.label+'</span></td></tr>';
+      var cells = cols.map(function(c){ return "<td>"+c.render(r)+"</td>"; }).join("");
+      html += '<tr><td>'+escapeHtml(r.id)+'</td>' + cells +
+        '<td><span class="seg-badge" style="background:'+r.segment.color+'">'+r.segment.label+'</span></td></tr>';
     });
   }
   html += '</tbody>';
@@ -1116,16 +1179,26 @@ function renderRfmDetailTable(rows, totalCount){
 function getFilteredDetailRows(rows){
   var q = ($("detailSearchInput") ? $("detailSearchInput").value : "").trim().toLowerCase();
   var seg = $("detailSegmentFilter") ? $("detailSegmentFilter").value : "";
+  var freqMin = parseFloat($("detailFreqMin") ? $("detailFreqMin").value : "");
+  var freqMax = parseFloat($("detailFreqMax") ? $("detailFreqMax").value : "");
+  var monMin = parseFloat($("detailMonMin") ? $("detailMonMin").value : "");
+  var monMax = parseFloat($("detailMonMax") ? $("detailMonMax").value : "");
   return rows.filter(function(r){
     if(seg && r.segment.key !== seg) return false;
     if(q && String(r.id).toLowerCase().indexOf(q) === -1) return false;
+    if(!isNaN(freqMin) && r.frequency < freqMin) return false;
+    if(!isNaN(freqMax) && r.frequency > freqMax) return false;
+    if(!isNaN(monMin) && r.monetary < monMin) return false;
+    if(!isNaN(monMax) && r.monetary > monMax) return false;
     return true;
   });
 }
 function refreshDetailTableOnly(){
   renderRfmDetailTable(getFilteredDetailRows(lastRfmRows), lastRfmRows.length);
 }
-$("detailSearchInput") && $("detailSearchInput").addEventListener("input", refreshDetailTableOnly);
+["detailSearchInput","detailFreqMin","detailFreqMax","detailMonMin","detailMonMax"].forEach(function(id){
+  $(id) && $(id).addEventListener("input", refreshDetailTableOnly);
+});
 $("detailSegmentFilter") && $("detailSegmentFilter").addEventListener("change", refreshDetailTableOnly);
 function buildDetailSegmentFilter(){
   var sel = $("detailSegmentFilter"); if(!sel) return;
@@ -1636,6 +1709,8 @@ buildTrafficExampleUI();
 loadTrafficState();
 buildRfmExampleUI();
 buildDetailSegmentFilter();
+loadDetailColVisibility();
+buildDetailColToggle();
 loadTableZoom();
 loadRfmState();
 $("rfmBaseDate").value = rfmState.baseDate;

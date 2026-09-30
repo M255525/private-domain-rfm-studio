@@ -25,6 +25,7 @@
 - 不論哪種模式，一律跳出確認視窗讓使用者用下拉選單確認或手動調整，即時重繪前 3 位客戶的 `renderMapPreview()` 彙總後預覽，按「確認匯入」才真正寫入 `rfmState.customers`。過長的儲存格內容用 `truncateCellText()`（24字+刪節號）截斷顯示並加 `title` 屬性供 hover 查看完整內容，避免預覽表格/下拉選單被撐爆版面。
 - 兩個分頁各自 5 組快速範例（虛構情境／虛構客戶），互不影響。
 - **2026-09-30 加上搜尋／縮放／客群篩選**（使用者反映真實 Excel 匯入後筆數太多影響觀看）：客戶清單表格與客戶明細表格皆有搜尋框（`applyCustomerSearchFilter()`／`getFilteredDetailRows()`），客戶清單用「隱藏不比對的列」而非重新渲染，避免打亂 `data-idx` 對應到 `rfmState.customers` 陣列索引；顯示縮放用 CSS `zoom` 屬性（`--rfm-zoom` CSS variable，套在 `.rfm-zoomable` 的 `.table-scroll` 容器上，70%-130%，`pdrfmTableZoom` 記住設定）。**客戶明細的篩選只影響顯示，`recalcRfm()` 仍對全體 `rfmState.customers` 呼叫 `computeRfm()`**——R/F/M 十分位評分本來就要看全體客戶的相對分布才有意義，KPI／長條圖／散佈圖固定吃未篩選的 `lastRfmRows`，只有 `renderRfmDetailTable()` 吃 `getFilteredDetailRows(lastRfmRows)`；改這段時務必維持這個界線，不要把篩選後的子集拿去重算分數。
+- **同日再加上 F/M 範圍篩選＋欄位顯示/隱藏**（使用者反映客戶明細欄位太多太寬）：`getFilteredDetailRows()` 擴充 `detailFreqMin/Max`／`detailMonMin/Max` 四個 number input 做範圍篩選（留空即不限，用 `parseFloat` + `isNaN` 判斷，不是用 truthy 判斷 0 這種合法邊界值）。欄位顯示/隱藏用 `DETAIL_COLUMNS` 陣列（`{key,label,render(r)}`，客戶代號／客群固定不在此陣列內、永遠顯示）＋ `detailColVisible` 物件（`pdrfmDetailColumns` localStorage 記住設定）＋原生 `<details><summary>` 摺疊面板（免寫開闔 JS），`renderRfmDetailTable()` 依 `detailColVisible` 動態組表頭與每列儲存格，不是寫死 9 個固定欄位。
 
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）
 
