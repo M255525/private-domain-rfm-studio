@@ -20,7 +20,9 @@
 ## 資料流與儲存
 
 - 純前端，無後端；`localStorage` 兩個獨立 key：`pdrfmTrafficState`（方案設定）、`pdrfmRfmState`（客戶清單＋基準日）。AI 設定另存 `pdrfmApiConfig`。
-- CSV／Excel 匯入用 PapaParse + SheetJS（CDN）。**2026-09-30 改為「自動辨識＋確認視窗」流程**（不再是猜不到就直接失敗）：`mapHeaders()` 先用 `CSV_FIELD_ALIASES` 精確比對表頭別名，比對不到的欄位再用 `FIELD_HEURISTICS` 關鍵字子字串猜測（刻意排除單一字母關鍵字，避免誤判）；不論猜測結果如何，一律跳出 `#csvMapModal` 讓使用者用四個下拉選單確認或手動調整，即時重繪前 3 筆 `renderMapPreview()` 預覽，按「確認匯入」才真正呼叫 `rowsFromAoaWithMap()` 寫入 `rfmState.customers`。過長的儲存格內容用 `truncateCellText()`（24字+刪節號）截斷顯示並加 `title` 屬性供 hover 查看完整內容，避免預覽表格/下拉選單被撐爆版面。
+- CSV／Excel 匯入用 PapaParse + SheetJS（CDN）。**2026-09-30 改為「自動辨識＋確認視窗」流程**（不再是猜不到就直接失敗）：`mapHeaders()` 先用 `CSV_FIELD_ALIASES` 精確比對表頭別名，比對不到的欄位再用 `FIELD_HEURISTICS` 關鍵字子字串猜測。**`FIELD_HEURISTICS.id` 刻意不含單獨的「代號」「編號」**——這兩個字太通用，「訂單編號」「商品編號」這類非客戶欄位也會誤中（實測踩過這個坑：「客戶」＋「訂單編號」兩欄並存時，「訂單編號」曾被誤判成客戶代號，因為它先出現且包含「編號」子字串）；只保留「客戶／顧客／會員／customer／member／name／姓名」這類明確指向客戶身分的關鍵字。
+- **同日再追加「逐筆交易紀錄」彙總模式**：使用者反映實務上很多匯出檔是「每筆訂單一列」而非「每位客戶一列」，看不出哪欄是「購買次數」或「最近購買日期」（因為這兩欄根本不存在，需要從交易列彙總算出）。`#csvMapModal` 因此分兩組欄位對應（`MAP_FIELD_SELECTS_CUSTOMER` 4 欄 vs `MAP_FIELD_SELECTS_TXN` 3 欄：客戶代號／交易日期／交易金額），用 radio 切換；`rowsFromTransactions()` 依客戶代號分組，購買次數＝列數、最近購買日期＝交易日期最大值、累計消費金額＝交易金額加總。`openMapModal()` 猜不到 `frequency` 欄位但猜得到 `id` 時，預設自動切換到交易模式（`defaultTxnMode`），減少使用者自己發現要切換模式的摩擦。
+- 不論哪種模式，一律跳出確認視窗讓使用者用下拉選單確認或手動調整，即時重繪前 3 位客戶的 `renderMapPreview()` 彙總後預覽，按「確認匯入」才真正寫入 `rfmState.customers`。過長的儲存格內容用 `truncateCellText()`（24字+刪節號）截斷顯示並加 `title` 屬性供 hover 查看完整內容，避免預覽表格/下拉選單被撐爆版面。
 - 兩個分頁各自 5 組快速範例（虛構情境／虛構客戶），互不影響。
 
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）

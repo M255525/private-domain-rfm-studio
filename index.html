@@ -166,6 +166,11 @@ textarea.ai-extra{
 .modal-box{background:var(--panel-raised);border:1px solid var(--line);border-radius:14px;padding:26px 28px;width:560px;max-width:94vw;max-height:86vh;overflow-y:auto;}
 .modal-box h3{margin:0 0 6px;color:#fff;font-size:17px;}
 .modal-box .modal-desc{font-size:13px;color:var(--text-faint);margin-bottom:16px;line-height:1.6;}
+.map-mode-row{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;padding:12px 14px;background:var(--bg-alt);border:1px solid var(--line-soft);border-radius:10px;}
+.map-mode-opt{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--text);cursor:pointer;line-height:1.5;}
+.map-mode-opt input{margin-top:3px;flex:none;}
+.map-mode-hint{margin-top:-4px;}
+#mapFieldsTransaction.hidden, #mapFieldsCustomer.hidden{display:none;}
 .map-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .map-row label{width:130px;flex:none;font-size:13px;color:var(--text-dim);}
 .map-row select{flex:1;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 9px;font-size:13px;}
@@ -420,12 +425,27 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
   <div class="modal-box">
     <h3>確認欄位對應</h3>
     <p class="modal-desc">系統已嘗試自動比對上傳檔案的欄位標題，請確認或手動調整下方對應後再匯入；下方預覽區會即時跟著你的選擇更新（過長的欄位內容會自動截斷顯示，滑鼠移上去可看完整內容，不影響版面）。</p>
-    <div class="map-row"><label for="mapSelId">客戶代號</label><select id="mapSelId"></select></div>
-    <div class="map-row"><label for="mapSelDate">最近購買日期</label><select id="mapSelDate"></select></div>
-    <div class="map-row"><label for="mapSelFreq">購買次數(F)</label><select id="mapSelFreq"></select></div>
-    <div class="map-row"><label for="mapSelMonetary">累計消費金額(M)</label><select id="mapSelMonetary"></select></div>
+
+    <div class="map-mode-row">
+      <label class="map-mode-opt"><input type="radio" name="importMode" id="modeCustomer" value="customer" checked> 每位客戶一列（檔案裡已經有算好的「購買次數」「累計消費金額」欄位）</label>
+      <label class="map-mode-opt"><input type="radio" name="importMode" id="modeTransaction" value="transaction"> 逐筆交易紀錄（每筆訂單一列，同一位客戶會出現在很多列，看不出哪欄是「購買次數」「最近購買日期」時選這個）</label>
+    </div>
+    <p class="modal-desc map-mode-hint">選「逐筆交易紀錄」時，只需告訴系統客戶代號、交易日期、交易金額三欄在哪，「購買次數」＝該客戶出現的列數、「最近購買日期」＝該客戶所有交易日期中最新的一筆、「累計消費金額」＝該客戶所有交易金額加總，系統自動幫你算，不需要檔案裡已經有這兩欄。</p>
+
+    <div id="mapFieldsCustomer">
+      <div class="map-row"><label for="mapSelId">客戶代號</label><select id="mapSelId"></select></div>
+      <div class="map-row"><label for="mapSelDate">最近購買日期</label><select id="mapSelDate"></select></div>
+      <div class="map-row"><label for="mapSelFreq">購買次數(F)</label><select id="mapSelFreq"></select></div>
+      <div class="map-row"><label for="mapSelMonetary">累計消費金額(M)</label><select id="mapSelMonetary"></select></div>
+    </div>
+    <div id="mapFieldsTransaction" class="hidden">
+      <div class="map-row"><label for="mapSelTxnId">客戶代號</label><select id="mapSelTxnId"></select></div>
+      <div class="map-row"><label for="mapSelTxnDate">交易日期</label><select id="mapSelTxnDate"></select></div>
+      <div class="map-row"><label for="mapSelTxnAmount">交易金額</label><select id="mapSelTxnAmount"></select></div>
+    </div>
+
     <div class="map-preview">
-      <h4>預覽（前 3 筆）</h4>
+      <h4>預覽（彙總後前 3 位客戶）</h4>
       <div class="table-scroll"><table id="mapPreviewTable"></table></div>
     </div>
     <div class="modal-actions">
@@ -1069,7 +1089,8 @@ var CSV_FIELD_ALIASES = {
 };
 // 表頭精確比對別名清單失敗時的備援：用關鍵字子字串猜測（刻意不含單一字母，避免誤判）
 var FIELD_HEURISTICS = {
-  id: ["代號","編號","客戶","顧客","會員","姓名","customer","member","name"],
+  // 刻意不含單獨的「代號」「編號」——這兩個字太通用，訂單編號／商品編號等非客戶欄位也會誤中
+  id: ["客戶","顧客","會員","customer","member","name","姓名"],
   lastPurchaseDate: ["日期","time","時間"],
   frequency: ["次數","頻率","count","frequency"],
   monetary: ["金額","消費","總額","amount","monetary","spend","total","revenue","營收"]
@@ -1125,17 +1146,19 @@ function loadCsvLibs(){
   });
 }
 
-/* ---------- 欄位對應確認視窗（自動猜測＋手動調整＋即時預覽） ---------- */
-var MAP_FIELD_SELECTS = { id:"mapSelId", lastPurchaseDate:"mapSelDate", frequency:"mapSelFreq", monetary:"mapSelMonetary" };
+/* ---------- 欄位對應確認視窗（自動猜測＋手動調整＋即時預覽；支援「每人一列」或「逐筆交易」兩種來源格式） ---------- */
+var MAP_FIELD_SELECTS_CUSTOMER = { id:"mapSelId", lastPurchaseDate:"mapSelDate", frequency:"mapSelFreq", monetary:"mapSelMonetary" };
+var MAP_FIELD_SELECTS_TXN = { id:"mapSelTxnId", lastPurchaseDate:"mapSelTxnDate", monetary:"mapSelTxnAmount" };
 var pendingImportAoa = null;
 
 function truncateCellText(v){
   var s = v==null ? "" : String(v);
   return s.length > 24 ? s.slice(0,23) + "…" : s;
 }
-function populateMapSelects(headers, guessMap){
-  Object.keys(MAP_FIELD_SELECTS).forEach(function(field){
-    var sel = $(MAP_FIELD_SELECTS[field]);
+function currentImportMode(){ return $("modeTransaction").checked ? "transaction" : "customer"; }
+function populateSelectGroup(selectIds, headers, guessMap){
+  Object.keys(selectIds).forEach(function(field){
+    var sel = $(selectIds[field]);
     sel.innerHTML = "";
     var emptyOpt = document.createElement("option");
     emptyOpt.value = ""; emptyOpt.textContent = "-- 請選擇欄位 --";
@@ -1150,16 +1173,51 @@ function populateMapSelects(headers, guessMap){
     sel.value = guessMap[field]!=null ? guessMap[field] : "";
   });
 }
-function currentMapSelection(){
+function readSelectGroup(selectIds){
   var out = {};
-  Object.keys(MAP_FIELD_SELECTS).forEach(function(field){
-    var v = $(MAP_FIELD_SELECTS[field]).value;
+  Object.keys(selectIds).forEach(function(field){
+    var v = $(selectIds[field]).value;
     out[field] = v === "" ? null : parseInt(v,10);
   });
   return out;
 }
-function renderMapPreview(aoa, map){
-  var rows = rowsFromAoaWithMap(aoa, map).slice(0,3);
+// 逐筆交易紀錄彙總：同一客戶代號可能出現在多列，購買次數＝列數、最近購買日期＝所有交易日期取最大值、
+// 累計消費金額＝所有交易金額加總——這樣使用者不需要檔案裡已經有現成的「購買次數」欄位
+function rowsFromTransactions(aoa, map){
+  var groups = {}; var order = [];
+  for(var i=1;i<aoa.length;i++){
+    var row = aoa[i]; if(!row || !row.length) continue;
+    var idVal = map.id!=null ? row[map.id] : null;
+    if(idVal == null || idVal === "") continue;
+    var idStr = String(idVal);
+    if(!groups[idStr]){ groups[idStr] = { dates:[], sum:0, count:0 }; order.push(idStr); }
+    var g = groups[idStr];
+    var dateVal = map.lastPurchaseDate!=null ? row[map.lastPurchaseDate] : null;
+    var d = null;
+    if(dateVal instanceof Date) d = dateVal;
+    else if(dateVal){ d = parseIsoDate(dateVal); }
+    if(d) g.dates.push(d);
+    g.count += 1;
+    var amt = map.monetary!=null ? parseFloat(row[map.monetary]) : NaN;
+    if(!isNaN(amt)) g.sum += amt;
+  }
+  return order.map(function(idStr){
+    var g = groups[idStr];
+    var maxDate = g.dates.length ? new Date(Math.max.apply(null, g.dates.map(function(d){ return d.getTime(); }))) : null;
+    return { id: idStr, lastPurchaseDate: maxDate ? isoDate(maxDate) : "", frequency: g.count, monetary: g.sum };
+  });
+}
+function buildRowsForCurrentMode(){
+  if(!pendingImportAoa) return [];
+  if(currentImportMode() === "transaction") return rowsFromTransactions(pendingImportAoa, readSelectGroup(MAP_FIELD_SELECTS_TXN));
+  return rowsFromAoaWithMap(pendingImportAoa, readSelectGroup(MAP_FIELD_SELECTS_CUSTOMER));
+}
+function currentModeIsComplete(){
+  var map = currentImportMode() === "transaction" ? readSelectGroup(MAP_FIELD_SELECTS_TXN) : readSelectGroup(MAP_FIELD_SELECTS_CUSTOMER);
+  return Object.keys(map).every(function(k){ return map[k] != null; });
+}
+function renderMapPreview(){
+  var rows = buildRowsForCurrentMode().slice(0,3);
   var html = "<thead><tr><th>客戶代號</th><th>最近購買日期</th><th>購買次數</th><th>累計消費金額</th></tr></thead><tbody>";
   if(!rows.length){
     html += '<tr><td colspan="4" style="color:var(--text-faint);white-space:normal;">目前欄位對應解析不出任何資料列，請檢查上方選擇是否正確</td></tr>';
@@ -1176,34 +1234,42 @@ function renderMapPreview(aoa, map){
   html += "</tbody>";
   $("mapPreviewTable").innerHTML = html;
 }
+function updateModeVisibility(){
+  var isTxn = currentImportMode() === "transaction";
+  $("mapFieldsCustomer").classList.toggle("hidden", isTxn);
+  $("mapFieldsTransaction").classList.toggle("hidden", !isTxn);
+  renderMapPreview();
+}
 function openMapModal(aoa){
   pendingImportAoa = aoa;
   var headers = aoa[0] || [];
-  populateMapSelects(headers, mapHeaders(headers));
-  renderMapPreview(aoa, currentMapSelection());
+  var guessMap = mapHeaders(headers);
+  populateSelectGroup(MAP_FIELD_SELECTS_CUSTOMER, headers, guessMap);
+  populateSelectGroup(MAP_FIELD_SELECTS_TXN, headers, { id: guessMap.id, lastPurchaseDate: guessMap.lastPurchaseDate, monetary: guessMap.monetary });
+  // 猜不到「購買次數」欄位、但猜得到客戶代號時，很可能是逐筆交易資料，預設切換到交易彙總模式
+  var defaultTxnMode = guessMap.frequency == null && guessMap.id != null;
+  $("modeCustomer").checked = !defaultTxnMode;
+  $("modeTransaction").checked = defaultTxnMode;
+  updateModeVisibility();
   $("csvMapModal").classList.add("show");
 }
 function closeMapModal(){
   $("csvMapModal").classList.remove("show");
   pendingImportAoa = null;
 }
-Object.keys(MAP_FIELD_SELECTS).forEach(function(field){
-  var sel = $(MAP_FIELD_SELECTS[field]);
-  sel && sel.addEventListener("change", function(){
-    if(pendingImportAoa) renderMapPreview(pendingImportAoa, currentMapSelection());
-  });
-});
+Object.keys(MAP_FIELD_SELECTS_CUSTOMER).map(function(f){ return MAP_FIELD_SELECTS_CUSTOMER[f]; })
+  .concat(Object.keys(MAP_FIELD_SELECTS_TXN).map(function(f){ return MAP_FIELD_SELECTS_TXN[f]; }))
+  .forEach(function(id){ var sel = $(id); sel && sel.addEventListener("change", renderMapPreview); });
+$("modeCustomer") && $("modeCustomer").addEventListener("change", updateModeVisibility);
+$("modeTransaction") && $("modeTransaction").addEventListener("change", updateModeVisibility);
 $("mapCancelBtn") && $("mapCancelBtn").addEventListener("click", closeMapModal);
 $("mapConfirmBtn") && $("mapConfirmBtn").addEventListener("click", function(){
-  var map = currentMapSelection();
-  if(map.id==null || map.lastPurchaseDate==null || map.frequency==null || map.monetary==null){
-    showToast("請完整選擇四個欄位對應後再匯入"); return;
-  }
-  var rows = rowsFromAoaWithMap(pendingImportAoa, map);
+  if(!currentModeIsComplete()){ showToast("請完整選擇欄位對應後再匯入"); return; }
+  var rows = buildRowsForCurrentMode();
   if(!rows.length){ showToast("目前欄位對應解析不出任何資料列，請確認選擇"); return; }
   rfmState.customers = rows; rfmState.presetId = null;
   persistRfmState(); syncRfmExampleUI(); renderCustomerTable(); recalcRfm();
-  showToast("已匯入 " + rows.length + " 筆客戶資料");
+  showToast("已匯入 " + rows.length + " 筆客戶資料" + (currentImportMode()==="transaction" ? "（已依交易紀錄自動彙總）" : ""));
   closeMapModal();
 });
 
