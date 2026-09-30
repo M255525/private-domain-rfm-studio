@@ -160,6 +160,21 @@ textarea.ai-extra{
 .ai-badge.mode-err{background:rgba(240,87,107,.15);color:var(--bad);}
 .hint{font-size:12px;color:var(--text-faint);}
 
+/* ---------- 欄位對應確認視窗 ---------- */
+.modal-overlay{position:fixed;inset:0;background:rgba(6,7,12,.75);z-index:2500;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.show{display:flex;}
+.modal-box{background:var(--panel-raised);border:1px solid var(--line);border-radius:14px;padding:26px 28px;width:560px;max-width:94vw;max-height:86vh;overflow-y:auto;}
+.modal-box h3{margin:0 0 6px;color:#fff;font-size:17px;}
+.modal-box .modal-desc{font-size:13px;color:var(--text-faint);margin-bottom:16px;line-height:1.6;}
+.map-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.map-row label{width:130px;flex:none;font-size:13px;color:var(--text-dim);}
+.map-row select{flex:1;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 9px;font-size:13px;}
+.map-preview{margin-top:16px;}
+.map-preview h4{font-size:12.5px;color:var(--text-faint);margin:0 0 8px;font-weight:600;}
+.map-preview table{width:100%;border-collapse:collapse;font-size:12px;}
+.map-preview th,.map-preview td{padding:5px 7px;border-bottom:1px solid var(--line-soft);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}
+.modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+
 /* ---------- 序號授權閘門 ---------- */
 #licenseGate{position:fixed;inset:0;background:rgba(6,7,12,.92);z-index:3500;display:flex;align-items:center;justify-content:center;padding:20px;}
 #licenseGate.hidden{display:none;}
@@ -355,7 +370,7 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
           <tbody id="customerTableBody"></tbody>
         </table>
       </div>
-      <p class="hint">CSV 欄位標題請用：客戶代號、最近購買日期（YYYY-MM-DD）、購買次數、累計消費金額。</p>
+      <p class="hint">上傳 CSV／Excel 後會自動嘗試辨識「客戶代號／最近購買日期／購買次數／累計消費金額」四個欄位對應，並跳出確認視窗讓你檢查或手動調整，確認後才會真正匯入取代目前清單。</p>
     </div>
 
     <div class="card">
@@ -400,6 +415,25 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
     </div>
   </div>
 </main>
+
+<div class="modal-overlay" id="csvMapModal">
+  <div class="modal-box">
+    <h3>確認欄位對應</h3>
+    <p class="modal-desc">系統已嘗試自動比對上傳檔案的欄位標題，請確認或手動調整下方對應後再匯入；下方預覽區會即時跟著你的選擇更新（過長的欄位內容會自動截斷顯示，滑鼠移上去可看完整內容，不影響版面）。</p>
+    <div class="map-row"><label for="mapSelId">客戶代號</label><select id="mapSelId"></select></div>
+    <div class="map-row"><label for="mapSelDate">最近購買日期</label><select id="mapSelDate"></select></div>
+    <div class="map-row"><label for="mapSelFreq">購買次數(F)</label><select id="mapSelFreq"></select></div>
+    <div class="map-row"><label for="mapSelMonetary">累計消費金額(M)</label><select id="mapSelMonetary"></select></div>
+    <div class="map-preview">
+      <h4>預覽（前 3 筆）</h4>
+      <div class="table-scroll"><table id="mapPreviewTable"></table></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" id="mapCancelBtn">取消</button>
+      <button type="button" class="btn" id="mapConfirmBtn">確認匯入</button>
+    </div>
+  </div>
+</div>
 
 <div id="printReportRoot"></div>
 <div id="pdfWatermark"><img id="wmImg" alt=""></div>
@@ -1025,31 +1059,44 @@ function recalcRfm(){
 }
 
 /* =====================================================================
-   PART C：CSV / Excel 上傳下載（RFM 客戶清單）
+   PART C：CSV / Excel 上傳下載（RFM 客戶清單）—— 自動辨識欄位＋可手動調整確認
    ===================================================================== */
 var CSV_FIELD_ALIASES = {
-  id: ["客戶代號","客戶編號","顧客代號","customerid","id"],
-  lastPurchaseDate: ["最近購買日期","最後購買日期","購買日期","lastpurchasedate","date"],
-  frequency: ["購買次數","訂單次數","次數","frequency","f"],
-  monetary: ["累計消費金額","消費金額","金額","monetary","m"]
+  id: ["客戶代號","客戶編號","顧客代號","客戶id","顧客id","會員編號","會員代號","會員id","customerid","customer id","memberid","member id","customer","id"],
+  lastPurchaseDate: ["最近購買日期","最後購買日期","購買日期","最近消費日期","最後消費日期","最近交易日期","訂單日期","lastpurchasedate","last purchase date","purchasedate","orderdate","date"],
+  frequency: ["購買次數","訂單次數","消費次數","交易次數","次數","frequency","purchasecount","ordercount","f"],
+  monetary: ["累計消費金額","消費金額","消費總額","總消費金額","總金額","交易金額","訂單金額","金額","monetary","totalamount","total spend","amount","spend","m"]
 };
-function normalizeHeader(h){ return String(h==null?"":h).trim().toLowerCase().replace(/[\s()（）]/g,""); }
+// 表頭精確比對別名清單失敗時的備援：用關鍵字子字串猜測（刻意不含單一字母，避免誤判）
+var FIELD_HEURISTICS = {
+  id: ["代號","編號","客戶","顧客","會員","姓名","customer","member","name"],
+  lastPurchaseDate: ["日期","time","時間"],
+  frequency: ["次數","頻率","count","frequency"],
+  monetary: ["金額","消費","總額","amount","monetary","spend","total","revenue","營收"]
+};
+function normalizeHeader(h){ return String(h==null?"":h).trim().toLowerCase().replace(/[\s()（）_-]/g,""); }
 function mapHeaders(headers){
+  var normalized = headers.map(normalizeHeader);
   var map = {};
-  headers.forEach(function(h, idx){
-    var nh = normalizeHeader(h);
-    Object.keys(CSV_FIELD_ALIASES).forEach(function(field){
-      if(map[field] != null) return;
-      var aliases = CSV_FIELD_ALIASES[field].map(normalizeHeader);
-      if(aliases.indexOf(nh) !== -1) map[field] = idx;
-    });
+  Object.keys(CSV_FIELD_ALIASES).forEach(function(field){
+    var aliases = CSV_FIELD_ALIASES[field].map(normalizeHeader);
+    for(var i=0;i<normalized.length;i++){
+      if(aliases.indexOf(normalized[i]) !== -1){ map[field] = i; return; }
+    }
+  });
+  var used = {}; Object.keys(map).forEach(function(f){ used[map[f]] = true; });
+  Object.keys(FIELD_HEURISTICS).forEach(function(field){
+    if(map[field] != null) return;
+    var keywords = FIELD_HEURISTICS[field];
+    for(var i=0;i<normalized.length;i++){
+      if(used[i]) continue;
+      var nh = normalized[i];
+      if(keywords.some(function(k){ return nh.indexOf(k) !== -1; })){ map[field] = i; used[i] = true; return; }
+    }
   });
   return map;
 }
-function rowsFromAoa(aoa){
-  if(!aoa || !aoa.length) return [];
-  var headers = aoa[0];
-  var map = mapHeaders(headers);
+function rowsFromAoaWithMap(aoa, map){
   var out = [];
   for(var i=1;i<aoa.length;i++){
     var row = aoa[i]; if(!row || !row.length) continue;
@@ -1077,6 +1124,89 @@ function loadCsvLibs(){
     check();
   });
 }
+
+/* ---------- 欄位對應確認視窗（自動猜測＋手動調整＋即時預覽） ---------- */
+var MAP_FIELD_SELECTS = { id:"mapSelId", lastPurchaseDate:"mapSelDate", frequency:"mapSelFreq", monetary:"mapSelMonetary" };
+var pendingImportAoa = null;
+
+function truncateCellText(v){
+  var s = v==null ? "" : String(v);
+  return s.length > 24 ? s.slice(0,23) + "…" : s;
+}
+function populateMapSelects(headers, guessMap){
+  Object.keys(MAP_FIELD_SELECTS).forEach(function(field){
+    var sel = $(MAP_FIELD_SELECTS[field]);
+    sel.innerHTML = "";
+    var emptyOpt = document.createElement("option");
+    emptyOpt.value = ""; emptyOpt.textContent = "-- 請選擇欄位 --";
+    sel.appendChild(emptyOpt);
+    headers.forEach(function(h, idx){
+      var opt = document.createElement("option");
+      opt.value = idx;
+      opt.textContent = (h==null || h==="") ? ("(第 " + (idx+1) + " 欄)") : truncateCellText(h);
+      opt.title = h==null ? "" : String(h);
+      sel.appendChild(opt);
+    });
+    sel.value = guessMap[field]!=null ? guessMap[field] : "";
+  });
+}
+function currentMapSelection(){
+  var out = {};
+  Object.keys(MAP_FIELD_SELECTS).forEach(function(field){
+    var v = $(MAP_FIELD_SELECTS[field]).value;
+    out[field] = v === "" ? null : parseInt(v,10);
+  });
+  return out;
+}
+function renderMapPreview(aoa, map){
+  var rows = rowsFromAoaWithMap(aoa, map).slice(0,3);
+  var html = "<thead><tr><th>客戶代號</th><th>最近購買日期</th><th>購買次數</th><th>累計消費金額</th></tr></thead><tbody>";
+  if(!rows.length){
+    html += '<tr><td colspan="4" style="color:var(--text-faint);white-space:normal;">目前欄位對應解析不出任何資料列，請檢查上方選擇是否正確</td></tr>';
+  } else {
+    rows.forEach(function(r){
+      html += "<tr>" +
+        '<td title="'+escapeHtml(r.id)+'">'+escapeHtml(truncateCellText(r.id))+"</td>" +
+        '<td title="'+escapeHtml(r.lastPurchaseDate||"")+'">'+escapeHtml(r.lastPurchaseDate||"-")+"</td>" +
+        "<td>"+fmtInt(r.frequency)+"</td>" +
+        "<td>"+fmtMoney(r.monetary)+"</td>" +
+        "</tr>";
+    });
+  }
+  html += "</tbody>";
+  $("mapPreviewTable").innerHTML = html;
+}
+function openMapModal(aoa){
+  pendingImportAoa = aoa;
+  var headers = aoa[0] || [];
+  populateMapSelects(headers, mapHeaders(headers));
+  renderMapPreview(aoa, currentMapSelection());
+  $("csvMapModal").classList.add("show");
+}
+function closeMapModal(){
+  $("csvMapModal").classList.remove("show");
+  pendingImportAoa = null;
+}
+Object.keys(MAP_FIELD_SELECTS).forEach(function(field){
+  var sel = $(MAP_FIELD_SELECTS[field]);
+  sel && sel.addEventListener("change", function(){
+    if(pendingImportAoa) renderMapPreview(pendingImportAoa, currentMapSelection());
+  });
+});
+$("mapCancelBtn") && $("mapCancelBtn").addEventListener("click", closeMapModal);
+$("mapConfirmBtn") && $("mapConfirmBtn").addEventListener("click", function(){
+  var map = currentMapSelection();
+  if(map.id==null || map.lastPurchaseDate==null || map.frequency==null || map.monetary==null){
+    showToast("請完整選擇四個欄位對應後再匯入"); return;
+  }
+  var rows = rowsFromAoaWithMap(pendingImportAoa, map);
+  if(!rows.length){ showToast("目前欄位對應解析不出任何資料列，請確認選擇"); return; }
+  rfmState.customers = rows; rfmState.presetId = null;
+  persistRfmState(); syncRfmExampleUI(); renderCustomerTable(); recalcRfm();
+  showToast("已匯入 " + rows.length + " 筆客戶資料");
+  closeMapModal();
+});
+
 $("uploadCsvBtn") && $("uploadCsvBtn").addEventListener("click", function(){ $("csvFileInput").click(); });
 $("csvFileInput") && $("csvFileInput").addEventListener("change", function(e){
   var file = e.target.files && e.target.files[0]; if(!file) return;
@@ -1084,11 +1214,9 @@ $("csvFileInput") && $("csvFileInput").addEventListener("change", function(e){
     var name = file.name.toLowerCase();
     if(name.endsWith(".csv")){
       Papa.parse(file, { complete:function(res){
-        var rows = rowsFromAoa(res.data);
-        if(!rows.length){ showToast("找不到可辨識的欄位，請確認標題列"); return; }
-        rfmState.customers = rows; rfmState.presetId = null;
-        persistRfmState(); syncRfmExampleUI(); renderCustomerTable(); recalcRfm();
-        showToast("已匯入 " + rows.length + " 筆客戶資料");
+        var aoa = res.data;
+        if(!aoa || !aoa.length){ showToast("檔案內容是空的"); return; }
+        openMapModal(aoa);
       }});
     } else if(name.endsWith(".xlsx") || name.endsWith(".xls")){
       var reader = new FileReader();
@@ -1096,11 +1224,8 @@ $("csvFileInput") && $("csvFileInput").addEventListener("change", function(e){
         var wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array", cellDates:true});
         var ws = wb.Sheets[wb.SheetNames[0]];
         var aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
-        var rows = rowsFromAoa(aoa);
-        if(!rows.length){ showToast("找不到可辨識的欄位，請確認標題列"); return; }
-        rfmState.customers = rows; rfmState.presetId = null;
-        persistRfmState(); syncRfmExampleUI(); renderCustomerTable(); recalcRfm();
-        showToast("已匯入 " + rows.length + " 筆客戶資料");
+        if(!aoa || !aoa.length){ showToast("檔案內容是空的"); return; }
+        openMapModal(aoa);
       };
       reader.readAsArrayBuffer(file);
     } else {
