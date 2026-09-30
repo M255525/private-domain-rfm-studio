@@ -72,6 +72,8 @@ main{max-width:1180px;margin:0 auto;padding:22px 20px 70px;}
 .collapsed-summary{display:none;}
 #customerListCard.collapsed #customerListBody{display:none;}
 #customerListCard.collapsed .collapsed-summary{display:block;margin-top:8px;}
+#detailCard.collapsed #detailBody{display:none;}
+#detailCard.collapsed .collapsed-summary{display:block;margin-top:8px;}
 .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;}
 
 /* ---------- Pills / examples ---------- */
@@ -424,30 +426,36 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
       </div>
     </div>
 
-    <div class="card">
-      <h2>客戶明細</h2>
-      <div class="filter-row">
-        <input type="text" id="detailSearchInput" placeholder="🔍 搜尋客戶代號…">
-        <select id="detailSegmentFilter"></select>
-        <div class="range-filter">
-          <span>F</span>
-          <input type="number" id="detailFreqMin" placeholder="最小" min="0">
-          <span>~</span>
-          <input type="number" id="detailFreqMax" placeholder="最大" min="0">
-        </div>
-        <div class="range-filter">
-          <span>M</span>
-          <input type="number" id="detailMonMin" placeholder="最小" min="0">
-          <span>~</span>
-          <input type="number" id="detailMonMax" placeholder="最大" min="0">
-        </div>
-        <details class="col-toggle">
-          <summary>⚙ 顯示欄位</summary>
-          <div class="col-toggle-panel" id="detailColToggle"></div>
-        </details>
-        <span class="filter-count" id="detailFilterCount"></span>
+    <div class="card" id="detailCard">
+      <div class="card-header-row">
+        <h2>客戶明細</h2>
+        <button type="button" class="btn secondary" id="detailToggle">▲ 收合</button>
       </div>
-      <div class="table-scroll rfm-zoomable"><table class="result-table" id="rfmDetailTable"></table></div>
+      <p class="hint collapsed-summary" id="detailCollapsedHint"></p>
+      <div id="detailBody">
+        <div class="filter-row">
+          <input type="text" id="detailSearchInput" placeholder="🔍 搜尋客戶代號…">
+          <select id="detailSegmentFilter"></select>
+          <div class="range-filter">
+            <span>F</span>
+            <input type="number" id="detailFreqMin" placeholder="最小" min="0">
+            <span>~</span>
+            <input type="number" id="detailFreqMax" placeholder="最大" min="0">
+          </div>
+          <div class="range-filter">
+            <span>M</span>
+            <input type="number" id="detailMonMin" placeholder="最小" min="0">
+            <span>~</span>
+            <input type="number" id="detailMonMax" placeholder="最大" min="0">
+          </div>
+          <details class="col-toggle">
+            <summary>⚙ 顯示欄位</summary>
+            <div class="col-toggle-panel" id="detailColToggle"></div>
+          </details>
+          <span class="filter-count" id="detailFilterCount"></span>
+        </div>
+        <div class="table-scroll rfm-zoomable"><table class="result-table" id="rfmDetailTable"></table></div>
+      </div>
     </div>
 
     <div class="card" id="aiCardRfm">
@@ -1206,6 +1214,27 @@ function renderRfmDetailTable(rows, totalCount){
   $("rfmDetailTable").innerHTML = html;
   var countEl = $("detailFilterCount");
   if(countEl) countEl.textContent = (rows.length===totalCount) ? "" : ("顯示 " + rows.length + " / " + totalCount + " 筆");
+  updateDetailCollapsedHint(totalCount);
+}
+// 客戶明細區塊收合：做法比照「客戶清單與基準日」卡片
+var DETAIL_COLLAPSE_KEY = "pdrfmDetailCollapsed";
+function updateDetailCollapsedHint(totalCount){
+  var hint = $("detailCollapsedHint"); if(!hint) return;
+  if($("detailCard").classList.contains("collapsed")){
+    hint.textContent = "已收合，目前共 " + totalCount + " 筆客戶的明細，點右上角「展開」可檢視。";
+  }
+}
+function setDetailCollapsed(collapsed){
+  $("detailCard").classList.toggle("collapsed", collapsed);
+  $("detailToggle").textContent = collapsed ? "▼ 展開" : "▲ 收合";
+  updateDetailCollapsedHint(lastRfmRows.length);
+  try{ localStorage.setItem(DETAIL_COLLAPSE_KEY, collapsed ? "1" : "0"); }catch(e){}
+}
+$("detailToggle") && $("detailToggle").addEventListener("click", function(){
+  setDetailCollapsed(!$("detailCard").classList.contains("collapsed"));
+});
+function loadDetailCollapse(){
+  setDetailCollapsed(localStorage.getItem(DETAIL_COLLAPSE_KEY) === "1");
 }
 // 篩選只影響「客戶明細」表格的顯示，客群分布 KPI／圖表仍依全體客戶計算（R/F/M 百分等級評分本來就要看全體分布才有意義）
 function getFilteredDetailRows(rows){
@@ -1746,6 +1775,7 @@ buildDetailColToggle();
 loadTableZoom();
 loadRfmState();
 loadCustomerListCollapse();
+loadDetailCollapse();
 $("rfmBaseDate").value = rfmState.baseDate;
 initAiSettings();
 buildAiPromptUI("aiPromptRowTraffic", AI_PROMPT_PRESETS_TRAFFIC, "aiExtraTraffic");
