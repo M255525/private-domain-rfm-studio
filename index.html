@@ -142,6 +142,11 @@ table{width:100%;border-collapse:collapse;font-size:13px;}
 .btn.secondary{background:var(--panel-raised);color:var(--text);border:1px solid var(--line);}
 .btn.secondary:hover{border-color:var(--accent);}
 .field-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;}
+.budget-calc-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:6px;}
+.budget-calc-row .field{flex:1 1 220px;min-width:180px;}
+.budget-calc-row .field label{display:block;font-size:12.5px;color:var(--text-dim);margin-bottom:5px;}
+.budget-calc-row .field input{width:100%;background:var(--bg-alt);border:1px solid var(--line);border-radius:8px;color:var(--text);font-family:var(--font-mono);padding:9px 12px;font-size:14px;}
+.budget-calc-sep{font-size:12px;color:var(--text-faint);text-align:center;flex:0 0 auto;padding-bottom:10px;white-space:nowrap;}
 .filter-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px;}
 .filter-row input[type=text]{flex:1 1 200px;min-width:160px;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-sans);padding:7px 10px;font-size:13px;}
 .filter-row select{background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-sans);padding:7px 10px;font-size:13px;}
@@ -325,6 +330,24 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
           <tbody id="scnTableBody"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card" id="budgetCard">
+      <h2>行銷預算編列：招攬成本試算</h2>
+      <p class="card-desc">以目前所選方案「平均招攬成本/位」為基礎，雙向試算「編列多少行銷預算」與「能招攬多少新客」，並預估這批新客的5年累計效益，作為編列行銷預算的參考。</p>
+      <div class="budget-calc-row">
+        <div class="field">
+          <label for="budgetAmountInput">行銷預算總額 (NT$)</label>
+          <input type="number" id="budgetAmountInput" min="0" step="1000">
+        </div>
+        <div class="budget-calc-sep">⇄ 依平均招攬成本換算 ⇄</div>
+        <div class="field">
+          <label for="budgetCustomersInput">目標招攬新客數 (人)</label>
+          <input type="number" id="budgetCustomersInput" min="0" step="1">
+        </div>
+      </div>
+      <p class="hint">目前方案的平均招攬成本為 NT$<span id="budgetAcqCostLabel"></span>/位；輸入任一欄位，另一欄會自動換算，以最後修改的欄位為準。下方效益預估套用目前選定方案的續訂率／年訂閱費／成本率，模擬「這批新客」的5年生命週期效益（跟下方「單批新訂戶」模型算法相同，只是把新訂戶數換成這裡設定的目標人數）。</p>
+      <div class="kpi-row" id="budgetKpiRow"></div>
     </div>
 
     <div class="card">
@@ -929,12 +952,73 @@ function renderSensitivity(scn){
 
 function recalcTraffic(){
   var scn = currentScenario();
+  renderBudgetSection();
   renderCompareSection(scn);
   renderCohortSection(scn);
   renderGrowthChart(scn);
   renderRetentionCompare(scn);
   renderSensitivity(scn);
 }
+
+/* ---------- 行銷預算編列：以招攬成本雙向試算預算與可招攬新客數 ---------- */
+var BUDGET_STATE_KEY = "pdrfmBudgetState";
+var budgetState = { mode:"customers", amount:null, customers:null };
+function loadBudgetState(){
+  var loaded = false;
+  try{
+    var raw = JSON.parse(localStorage.getItem(BUDGET_STATE_KEY) || "null");
+    if(raw){ budgetState = raw; loaded = true; }
+  }catch(e){}
+  if(!loaded){ budgetState = { mode:"customers", customers: currentScenario().newSubs, amount:null }; }
+}
+function persistBudgetState(){
+  try{ localStorage.setItem(BUDGET_STATE_KEY, JSON.stringify(budgetState)); }catch(e){}
+}
+// 以目前選定方案的平均招攬成本為基準，依 budgetState.mode 決定用哪一欄反推另一欄
+function computeBudgetInfo(){
+  var scn = currentScenario();
+  var acqCost = scn.acqCost;
+  if(budgetState.mode === "amount"){
+    var amt = budgetState.amount || 0;
+    budgetState.customers = acqCost>0 ? Math.floor(amt/acqCost) : 0;
+  } else {
+    var cust = budgetState.customers || 0;
+    budgetState.amount = Math.round(cust*acqCost);
+  }
+  return { scn:scn, acqCost:acqCost, customers:budgetState.customers, amount:budgetState.amount };
+}
+function renderBudgetSection(){
+  var info = computeBudgetInfo();
+  if($("budgetAcqCostLabel")) $("budgetAcqCostLabel").textContent = fmtInt(info.acqCost);
+  if($("budgetAmountInput")) $("budgetAmountInput").value = info.amount || 0;
+  if($("budgetCustomersInput")) $("budgetCustomersInput").value = info.customers || 0;
+  var overrideScn = makeScenario(info.scn.annualFee, info.customers, info.scn.retention, info.scn.acqCost, info.scn.costRate);
+  var m = singleCohortModel(overrideScn, 5);
+  var row = $("budgetKpiRow"); if(!row) return;
+  row.innerHTML = "";
+  [
+    {label:"需編列行銷預算", value: fmtMoney(info.amount)},
+    {label:"預估可招攬新客數", value: fmtInt(info.customers) + " 人"},
+    {label:"這批新客 5年累計營收", value: fmtMoney(m.totals.revenue)},
+    {label:"這批新客 5年累計淨利", value: fmtMoney(m.totals.netProfit), bad: m.totals.netProfit<0}
+  ].forEach(function(k){
+    var d = document.createElement("div"); d.className = "kpi-card";
+    d.innerHTML = '<div class="kpi-label">'+escapeHtml(k.label)+'</div><div class="kpi-value '+(k.bad?"bad":"good")+'">'+k.value+'</div>';
+    row.appendChild(d);
+  });
+}
+$("budgetAmountInput") && $("budgetAmountInput").addEventListener("input", function(){
+  budgetState.mode = "amount";
+  budgetState.amount = parseFloat(this.value) || 0;
+  persistBudgetState();
+  renderBudgetSection();
+});
+$("budgetCustomersInput") && $("budgetCustomersInput").addEventListener("input", function(){
+  budgetState.mode = "customers";
+  budgetState.customers = parseFloat(this.value) || 0;
+  persistBudgetState();
+  renderBudgetSection();
+});
 
 /* =====================================================================
    PART B：RFM 顧客分群分析
@@ -1735,6 +1819,14 @@ function buildPrintReportTraffic(){
   html += '<tr><td>平均招攬成本/位</td><td>'+fmtMoney(scn.acqCost)+'</td></tr>';
   html += '<tr><td>成本率</td><td>'+Math.round(scn.costRate*100)+'%</td></tr>';
   html += '</table></div>';
+  var budgetInfo = computeBudgetInfo();
+  var budgetModel = singleCohortModel(makeScenario(budgetInfo.scn.annualFee, budgetInfo.customers, budgetInfo.scn.retention, budgetInfo.scn.acqCost, budgetInfo.scn.costRate), 5);
+  html += '<div class="pr-section"><h2>行銷預算編列：招攬成本試算</h2><table class="pr-table">';
+  html += '<tr><td>需編列行銷預算</td><td>'+fmtMoney(budgetInfo.amount)+'</td></tr>';
+  html += '<tr><td>預估可招攬新客數</td><td>'+fmtInt(budgetInfo.customers)+' 人</td></tr>';
+  html += '<tr><td>這批新客 5年累計營收</td><td>'+fmtMoney(budgetModel.totals.revenue)+'</td></tr>';
+  html += '<tr class="pr-total"><td>這批新客 5年累計淨利</td><td>'+fmtMoney(budgetModel.totals.netProfit)+'</td></tr>';
+  html += '</table></div>';
   html += '<div class="pr-section"><h2>一般行銷 vs 私域流量</h2><table class="pr-table">';
   html += '<tr><td>一般行銷 單年淨利</td><td>'+fmtMoney(oneTime.netProfit)+'</td></tr>';
   html += '<tr class="pr-total"><td>私域流量 5年累計淨利</td><td>'+fmtMoney(cohort5.totals.netProfit)+'</td></tr>';
@@ -1795,6 +1887,8 @@ if($("wmImg")) $("wmImg").src = "watermark-source.png";
 initTabs();
 buildTrafficExampleUI();
 loadTrafficState();
+loadBudgetState();
+renderBudgetSection();
 buildRfmExampleUI();
 buildDetailSegmentFilter();
 loadDetailColVisibility();

@@ -6,12 +6,21 @@
 
 「私域流量與RFM顧客價值分析工作站」單檔前端工具，兩大分析模組合一、各自獨立可用，用頂部分頁切換：
 
-- **💰 私域流量效益試算**：比較「一般行銷（單年、一次性）」vs「私域流量（訂閱制，依續訂率逐年遞減）」的長期效益。核心變數：年訂閱費／新訂戶數／續訂率／平均招攬成本／成本率，可設定「樂觀／一般／悲觀」三種情境。含：單批新訂戶 5 年生命週期衰退表、持續獲客的多世代疊加成長模型（6年）、續訂率情境比較（50/70/90%）、敏感度分析熱力表（新訂戶數 × 招攬成本 → 5年總淨利）。
+- **💰 私域流量效益試算**：比較「一般行銷（單年、一次性）」vs「私域流量（訂閱制，依續訂率逐年遞減）」的長期效益。核心變數：年訂閱費／新訂戶數／續訂率／平均招攬成本／成本率，可設定「樂觀／一般／悲觀」三種情境。含：**行銷預算編列（招攬成本雙向試算，2026-09-30 新增，見下）**、單批新訂戶 5 年生命週期衰退表、持續獲客的多世代疊加成長模型（6年）、續訂率情境比較（50/70/90%）、敏感度分析熱力表（新訂戶數 × 招攬成本 → 5年總淨利）。
 - **👥 RFM顧客分群分析**：客戶清單（手動增刪列或上傳 CSV／Excel）依「基準日」即時計算 R／F／M 十分位評分（1-10 分，tie-aware percentile rank），再以 6 分為門檻組合成 8 種客群（此 8 客群分類是本工具額外設計補上的業界常見通用框架，**非原始課程試算表既有邏輯**——原始試算表只算到 R/F/M 三個分數為止）。
 
 兩模組共用：頁面下方「⚙️ AI 設定」（BYOK，Claude/OpenAI/Gemini/OpenRouter 四選一，兩分頁共用同一組設定但各自獨立 prompt/結果）、各自的「📄 匯出試算報告（PDF）」（獨立 print-only 區塊 `#printReportRoot` + `#pdfWatermark`，非直接列印可見畫面）。**浮水印機制從一開始建置時就已存在**（`watermark-source.png` 已去背馬克老師吉祥物圖＋`#pdfWatermark`／`#wmImg`＋`@media print` CSS，比照 `new-product-strategy-studio` 等姊妹專案的做法），2026-09-30 用 `page.emulateMedia({media:'print'})`＋截圖實測過確認正常顯示，並非本次新增；使用者反映「要加浮水印」時純屬先前沒有實際驗證過，不是機制真的缺漏。
 
 **2026-09-30 為 RFM 報告加上客群分布圖表截圖**：`buildPrintReportRfm()` 原本只有文字表格，現在額外用 `chartToImageWithBg("segmentChart","#161A2C")`／`chartToImageWithBg("scatterChart","#161A2C")`（定義在 `renderChart()` 附近）把畫面上的長條圖／散佈圖轉成內嵌 `<img>`。**這裡刻意不是簡單呼叫 Chart.js 內建的 `toBase64Image()`**——那樣匯出的 PNG 背景透明，圖表的座標軸/圖例文字用的是淺色（`CHART_TEXT_COLOR="#A6ACC9"`，給深色底配色），直接疊在報告的白底版面上會看不清楚。`chartToImageWithBg()` 用 `ctx.globalCompositeOperation="destination-over"` 在畫布內容「後面」補畫一塊純色矩形再輸出 dataURL，輸出後立刻用事先存好的 `ImageData` 復原成原本透明的畫布（不影響畫面上即時互動的圖表本身）。深色底刻意畫進 PNG 像素、不是用 CSS `background-color`——後者預設會被瀏覽器「列印背景圖形」選項擋掉（使用者沒勾選就會消失），`<img>` 內容不受這個選項影響，跟浮水印圖片是同一個道理。
+
+## 行銷預算編列（招攬成本試算，2026-09-30 新增）
+
+使用者要求把「招攬每一位新客的成本」也納入行銷預算編列的考量。實作為雙向連動計算機（`budgetCard`）：「行銷預算總額」與「目標招攬新客數」兩個 input 互相換算，換算基準是目前選定方案的 `acqCost`（平均招攬成本/位）。
+
+- `budgetState = {mode, amount, customers}`（`pdrfmBudgetState` localStorage 記住），`mode` 記錄「最後修改的是哪一欄」——這個設計是刻意的：切換方案／範例導致 `acqCost` 改變時，要保留使用者原本的意圖（以預算為主還是以人數為主）重新換算另一欄，而不是兩欄都保持不變或都被覆寫。`computeBudgetInfo()` 依 `mode` 決定算哪一個：`mode==="amount"` 時 `customers = Math.floor(amount/acqCost)`（無條件捨去，不會有半個客戶）；`mode==="customers"` 時 `amount = Math.round(customers*acqCost)`。
+- 下方 KPI 用算出的 `customers` 覆寫 `newSubs` 跑一次既有的 `singleCohortModel()`（5年），跟「單批新訂戶」卡片同一套模型，只是新訂戶數換成這裡設定的目標人數——刻意重用既有函式而非另寫一套計算邏輯。
+- `renderBudgetSection()` 掛在 `recalcTraffic()` 開頭，任何會觸發 `recalcTraffic()` 的操作（切換方案/範例、編輯方案表格）都會連帶重算這個區塊。
+- `buildPrintReportTraffic()` 已同步加入這個區塊的內容（預算/人數/5年營收/5年淨利），使用者原話「另外也要增加PDF下載功能」實際上指的是「把這個新功能也納入既有的匯出試算報告（PDF）」，**不是另外做一個新的下載按鈕**——這個工具本來就有 `pdfBtnTraffic`／`pdfBtnRfm` 兩個既有匯出按鈕，理解需求時要留意這點，不要重複造一個功能相同的按鈕。
 
 ## 已知的模型設計決策（皆已寫入 manual.html，避免重複踩坑）
 
