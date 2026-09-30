@@ -1,0 +1,1462 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>私域流量與RFM顧客價值分析工作站</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<meta name="theme-color" content="#10131F">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="流量RFM工作站">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#10131F; --bg-alt:#161A2C; --panel:#1B2036; --panel-raised:#212745;
+  --line:#2E3555; --line-soft:#242A47;
+  --text:#E8EAF5; --text-dim:#A6ACC9; --text-faint:#6B7195;
+  --accent:#7C6FF0; --accent2:#2FD1C0;
+  --good:#3ECF8E; --warn:#F0B429; --bad:#F0576B;
+  --font-sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono","Noto Sans TC",monospace;
+}
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);line-height:1.6;overflow-x:hidden;}
+img,svg{max-width:100%;}
+a{color:var(--accent2);}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px;}
+
+/* ---------- Topbar ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  padding:16px 20px;border-bottom:1px solid var(--line-soft);background:var(--bg-alt);
+  position:sticky;top:0;z-index:1500;
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);}
+.hero-utility{display:flex;flex-wrap:wrap;gap:8px;}
+.hero-util-btn{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:.8rem;font-weight:500;
+  background:rgba(124,111,240,.12);color:var(--text);border:1px solid var(--line);border-radius:999px;
+  padding:8px 15px;cursor:pointer;text-decoration:none;
+}
+.hero-util-btn:hover{border-color:var(--accent);color:#fff;}
+
+/* ---------- Tabs ---------- */
+main{max-width:1180px;margin:0 auto;padding:22px 20px 70px;}
+.tab-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--line-soft);}
+.tab-btn{
+  font-family:var(--font-sans);font-size:14.5px;font-weight:700;letter-spacing:.02em;
+  background:transparent;color:var(--text-dim);border:1px solid transparent;border-bottom:none;
+  padding:12px 18px;border-radius:10px 10px 0 0;cursor:pointer;transition:.15s;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:#fff;background:var(--panel-raised);border-color:var(--line-soft);position:relative;top:1px;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ---------- Cards ---------- */
+.card{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:20px 22px;margin-bottom:18px;}
+.card h2{font-size:16.5px;margin:0 0 4px;color:#fff;}
+.card h3{font-size:14px;margin:18px 0 8px;color:var(--text-dim);}
+.card .card-desc{font-size:13px;color:var(--text-faint);margin:0 0 14px;}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;}
+
+/* ---------- Pills / examples ---------- */
+.example-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.pill{
+  font-family:var(--font-sans);font-size:12.5px;background:var(--panel-raised);color:var(--text-dim);
+  border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;transition:.15s;
+}
+.pill:hover{border-color:var(--accent);color:#fff;}
+.pill.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pill.pill-rfm.active{background:var(--accent2);border-color:var(--accent2);color:#0F1220;}
+
+/* ---------- Scenario table ---------- */
+.scn-select-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.scn-btn{
+  font-family:var(--font-sans);font-size:13px;font-weight:700;background:var(--panel-raised);color:var(--text-dim);
+  border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer;
+}
+.scn-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+.table-scroll{overflow-x:auto;min-width:0;}
+.scn-table th,.scn-table td{padding:8px 10px;border-bottom:1px solid var(--line-soft);text-align:right;white-space:nowrap;}
+.scn-table th:first-child,.scn-table td:first-child{text-align:left;}
+.scn-table input{
+  width:100px;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);
+  font-family:var(--font-mono);font-size:13px;padding:6px 8px;text-align:right;
+}
+.result-table td,.result-table th{padding:7px 10px;border-bottom:1px dotted var(--line-soft);text-align:right;font-size:13px;}
+.result-table th:first-child,.result-table td:first-child{text-align:left;color:var(--text-dim);}
+.result-table tr.total td{border-top:2px solid var(--line);font-weight:700;color:#fff;}
+.result-table tr.good td:last-child{color:var(--good);}
+.result-table tr.bad td:last-child{color:var(--bad);}
+
+/* ---------- KPI ---------- */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:10px 0 18px;}
+.kpi-card{background:var(--panel-raised);border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;}
+.kpi-card .kpi-label{font-size:11.5px;color:var(--text-faint);}
+.kpi-card .kpi-value{font-family:var(--font-mono);font-size:19px;font-weight:700;color:#fff;margin-top:4px;}
+.kpi-card .kpi-value.good{color:var(--good);}
+.kpi-card .kpi-value.bad{color:var(--bad);}
+
+/* ---------- Chart box ---------- */
+.chart-box{position:relative;height:260px;margin:10px 0;}
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;}
+
+/* ---------- Heatmap ---------- */
+.heatmap-table td{padding:10px;text-align:center;font-family:var(--font-mono);font-size:12.5px;border:1px solid var(--bg);color:#101010;}
+.heatmap-table th{padding:8px;font-size:11.5px;color:var(--text-dim);text-align:center;}
+.heatmap-table th.corner{color:var(--text-faint);font-size:10.5px;}
+
+/* ---------- RFM customer table ---------- */
+.customer-table input{
+  width:100%;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);
+  font-family:var(--font-mono);font-size:12.5px;padding:5px 6px;
+}
+.customer-table th,.customer-table td{padding:5px 6px;border-bottom:1px solid var(--line-soft);font-size:12.5px;}
+.row-del-btn{background:transparent;border:1px solid var(--line);color:var(--bad);border-radius:6px;cursor:pointer;padding:4px 8px;font-size:12px;}
+.row-del-btn:hover{border-color:var(--bad);}
+.seg-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700;color:#10131F;white-space:nowrap;}
+.toolbar-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.btn{
+  font-family:var(--font-sans);font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;
+  border-radius:8px;padding:9px 16px;cursor:pointer;
+}
+.btn:hover{filter:brightness(1.1);}
+.btn.secondary{background:var(--panel-raised);color:var(--text);border:1px solid var(--line);}
+.btn.secondary:hover{border-color:var(--accent);}
+.field-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;}
+.field-row label{font-size:13px;color:var(--text-dim);}
+.field-row input[type=date]{
+  background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);font-family:var(--font-mono);
+  padding:7px 10px;font-size:13px;
+}
+
+/* ---------- AI panel ---------- */
+.ai-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px;}
+.ai-grid label{display:block;font-size:12px;color:var(--text-faint);margin-bottom:4px;}
+.ai-grid select,.ai-grid input{
+  width:100%;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);
+  font-size:13px;padding:8px 9px;
+}
+textarea.ai-extra{
+  width:100%;min-height:60px;background:var(--bg-alt);border:1px solid var(--line);border-radius:8px;color:var(--text);
+  font-family:var(--font-sans);font-size:13px;padding:10px;resize:vertical;margin-bottom:8px;
+}
+.ai-prompt-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.ai-result{display:none;margin-top:14px;background:var(--bg-alt);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;white-space:pre-wrap;font-size:13.5px;}
+.ai-result.show{display:block;}
+.ai-badge{display:inline-block;font-family:var(--font-mono);font-size:.7rem;letter-spacing:.06em;padding:2px 9px;border-radius:999px;margin-bottom:10px;}
+.ai-badge.mode-ai{background:rgba(62,207,142,.15);color:var(--good);}
+.ai-badge.mode-err{background:rgba(240,87,107,.15);color:var(--bad);}
+.hint{font-size:12px;color:var(--text-faint);}
+
+/* ---------- Marquee ---------- */
+#marqueeBar{position:fixed;top:0;left:0;right:0;height:30px;background:var(--bg-alt);border-bottom:1px solid var(--line);z-index:2100;overflow:hidden;display:none;align-items:center;}
+#marqueeBar.show{display:flex;}
+#marqueeTrack{display:inline-block;white-space:nowrap;padding-left:100%;font-size:13px;font-weight:600;color:var(--warn);animation:marquee-scroll 30s linear infinite;}
+body.has-marquee{padding-top:30px;}
+body.has-marquee .topbar{top:30px;}
+@keyframes marquee-scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--panel-raised);color:var(--text);padding:10px 18px;border-radius:999px;border:1px solid var(--line);
+  font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:3000;max-width:90vw;text-align:center;
+}
+#toast.show{opacity:1;}
+
+/* ---------- Footer ---------- */
+footer{background:var(--bg-alt);color:var(--text-faint);padding:28px 0;font-size:.78rem;border-top:1px solid var(--line-soft);}
+footer .wrap{display:flex;flex-direction:column;gap:14px;}
+footer .disclaimer{max-width:66em;}
+footer .footer-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;}
+footer .footer-links{display:flex;flex-wrap:wrap;align-items:center;gap:14px;}
+footer .footer-links a{color:var(--text-faint);text-decoration:underline;}
+footer .footer-links a:hover{color:var(--text);}
+footer .footer-link-btn{
+  font-family:var(--font-sans);font-size:12.5px;background:transparent;color:var(--text-faint);
+  border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;
+}
+footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
+
+/* ---------- PDF export / print ---------- */
+#printReportRoot{display:none;}
+#pdfWatermark{display:none;}
+.pr-header{border-bottom:2px solid #10131F;padding-bottom:14px;margin-bottom:20px;}
+.pr-header h1{font-size:1.4rem;margin:0 0 6px;color:#10131F;}
+.pr-header .pr-meta{font-family:var(--font-mono);font-size:.75rem;color:#555;}
+.pr-section{margin-bottom:22px;break-inside:avoid;}
+.pr-section h2{font-size:1.02rem;color:#10131F;border-bottom:1px solid #ccc;padding-bottom:6px;margin:0 0 10px;}
+.pr-section p{font-size:.85rem;color:#222;margin:0 0 8px;}
+.pr-table{width:100%;border-collapse:collapse;font-size:.82rem;color:#222;}
+.pr-table td,.pr-table th{padding:4px 8px;border-bottom:1px dotted #ccc;text-align:right;}
+.pr-table td:first-child,.pr-table th:first-child{text-align:left;color:#555;}
+.pr-table tr.pr-total td{border-top:2px solid #10131F;font-weight:900;padding-top:8px;}
+.pr-ai-text{font-size:.85rem;white-space:pre-wrap;background:#f2f2f8;border-radius:6px;padding:12px 14px;color:#222;}
+.pr-footer{font-size:.72rem;color:#888;border-top:1px solid #ccc;padding-top:12px;margin-top:26px;}
+@media print{
+  body > *{display:none !important;}
+  #printReportRoot{display:block !important;}
+  #pdfWatermark{display:flex !important;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;}
+  #pdfWatermark img{width:42%;min-width:200px;max-width:380px;opacity:.11;}
+  body{background:#fff;}
+}
+</style>
+</head>
+<body>
+
+<div id="marqueeBar"><div id="marqueeTrack"></div></div>
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span><span>私域流量與RFM顧客價值分析工作站</span></div>
+  <div class="hero-utility">
+    <a class="hero-util-btn" href="manual.html">📖 操作手冊</a>
+    <button type="button" id="installBtn" class="hero-util-btn">📲 加入主畫面</button>
+  </div>
+</div>
+
+<main>
+  <div class="tab-nav" id="tabNav">
+    <button type="button" class="tab-btn active" data-tab="traffic">💰 私域流量效益試算</button>
+    <button type="button" class="tab-btn" data-tab="rfm">👥 RFM顧客分群分析</button>
+  </div>
+
+  <!-- ============ TAB 1：私域流量效益試算 ============ -->
+  <div class="tab-panel active" id="panelTraffic">
+
+    <div class="example-row" id="trafficExampleRow"></div>
+
+    <div class="card">
+      <h2>方案設定</h2>
+      <p class="card-desc">分別設定「樂觀／一般／悲觀」三種續訂情境的核心變數，並選擇目前要檢視哪一個方案；下方所有試算結果都會即時跟著更新。</p>
+      <div class="scn-select-row" id="scnSelectRow"></div>
+      <div class="table-scroll">
+        <table class="scn-table" id="scnTable">
+          <thead>
+            <tr><th>方案</th><th>年訂閱費(NT$)</th><th>新訂戶數(人)</th><th>續訂率(%)</th><th>平均招攬成本/位(NT$)</th><th>成本率(%)</th></tr>
+          </thead>
+          <tbody id="scnTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>一般行銷（單年、一次性）vs 私域流量（同批新戶，5年累計）</h2>
+      <p class="card-desc">同一批新戶，比較「只做一次性行銷、不續訂」跟「訂閱制、依續訂率逐年遞減」兩種模式的長期效益。</p>
+      <div class="kpi-row" id="compareKpiRow"></div>
+      <div class="chart-grid">
+        <div><div class="chart-box"><canvas id="compareChart"></canvas></div></div>
+        <div class="table-scroll"><table class="result-table" id="compareTable"></table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>單批新訂戶的 5 年生命週期衰退</h2>
+      <p class="card-desc">這一批 <span id="cohortNewSubsLabel"></span> 位新訂戶，依所選方案的續訂率，逐年還剩下多少人持續訂閱、貢獻多少營收與淨利（全程套用同一個續訂率，不會像原始試算表那樣中途跳回其他方案）。</p>
+      <div class="table-scroll"><table class="result-table" id="cohortTable"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>持續獲客的多世代疊加成長模型（6年）</h2>
+      <p class="card-desc">模擬公司每年都持續投入獲客：既有訂閱戶依續訂率衰退、同時每年疊加一批新訂戶，呈現整體會員數與淨利的長期成長走勢。</p>
+      <div class="chart-box"><canvas id="growthChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2>續訂率情境比較（50% / 70% / 90%）</h2>
+      <p class="card-desc">固定所選方案的其他變數，只改變續訂率，看看續訂率高低對長期會員數與淨利的影響差多少。</p>
+      <div class="chart-grid">
+        <div><h3>會員數成長比較</h3><div class="chart-box"><canvas id="retentionMembersChart"></canvas></div></div>
+        <div><h3>淨利成長比較</h3><div class="chart-box"><canvas id="retentionProfitChart"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>敏感度分析：新訂戶數 × 平均招攬成本 → 5年總淨利</h2>
+      <p class="card-desc">以目前所選方案為基準，即時試算「新訂戶數」與「平均招攬成本」在不同組合下，5年累計淨利會落在哪裡（顏色越綠表示淨利越高，越紅表示越低）。</p>
+      <div class="table-scroll"><table class="heatmap-table" id="sensitivityTable"></table></div>
+    </div>
+
+    <div class="card" id="aiCardTraffic">
+      <h2>🤖 AI 診斷（選用，需自備 API 金鑰）</h2>
+      <div class="ai-prompt-row" id="aiPromptRowTraffic"></div>
+      <textarea class="ai-extra" id="aiExtraTraffic" placeholder="想請 AI 特別針對哪個角度分析？可留空。"></textarea>
+      <button type="button" class="btn" id="aiDiagnoseBtnTraffic">請 AI 診斷</button>
+      <button type="button" class="btn secondary" id="pdfBtnTraffic">📄 匯出試算報告（PDF）</button>
+      <div class="ai-result" id="aiResultTraffic"></div>
+    </div>
+  </div>
+
+  <!-- ============ TAB 2：RFM顧客分群分析 ============ -->
+  <div class="tab-panel" id="panelRfm">
+
+    <div class="example-row" id="rfmExampleRow"></div>
+
+    <div class="card">
+      <h2>客戶清單與基準日</h2>
+      <p class="card-desc">輸入或上傳客戶清單（客戶代號／最近購買日期／購買次數／累計消費金額），本工具會依「基準日」即時計算每位客戶的 R／F／M 分數與客群。</p>
+      <div class="field-row">
+        <label for="rfmBaseDate">基準日（計算 Recency 的比較基準）</label>
+        <input type="date" id="rfmBaseDate">
+      </div>
+      <div class="toolbar-row">
+        <button type="button" class="btn secondary" id="addCustomerBtn">＋ 新增客戶</button>
+        <button type="button" class="btn secondary" id="uploadCsvBtn">📤 上傳 CSV／Excel</button>
+        <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+        <button type="button" class="btn secondary" id="downloadCsvBtn">📥 下載目前清單（CSV）</button>
+      </div>
+      <div class="table-scroll">
+        <table class="customer-table" id="customerTable">
+          <thead>
+            <tr><th>客戶代號</th><th>最近購買日期</th><th>購買次數(F)</th><th>累計消費金額(M)</th><th></th></tr>
+          </thead>
+          <tbody id="customerTableBody"></tbody>
+        </table>
+      </div>
+      <p class="hint">CSV 欄位標題請用：客戶代號、最近購買日期（YYYY-MM-DD）、購買次數、累計消費金額。</p>
+    </div>
+
+    <div class="card">
+      <h2>客群分布</h2>
+      <p class="card-desc">分群邏輯：R／F／M 三個 1-10 分數各自以 6 分為門檻分「高／低」，組合成 8 種客群（此為業界常見的 RFM 通用分群框架，非原始 Excel 既有邏輯，詳見操作手冊）。</p>
+      <div class="kpi-row" id="segmentKpiRow"></div>
+      <div class="chart-grid">
+        <div><div class="chart-box"><canvas id="segmentChart"></canvas></div></div>
+        <div><div class="chart-box"><canvas id="scatterChart"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>客戶明細</h2>
+      <div class="table-scroll"><table class="result-table" id="rfmDetailTable"></table></div>
+    </div>
+
+    <div class="card" id="aiCardRfm">
+      <h2>🤖 AI 診斷（選用，需自備 API 金鑰）</h2>
+      <div class="ai-prompt-row" id="aiPromptRowRfm"></div>
+      <textarea class="ai-extra" id="aiExtraRfm" placeholder="想請 AI 特別針對哪個角度分析？可留空。"></textarea>
+      <button type="button" class="btn" id="aiDiagnoseBtnRfm">請 AI 診斷</button>
+      <button type="button" class="btn secondary" id="pdfBtnRfm">📄 匯出試算報告（PDF）</button>
+      <div class="ai-result" id="aiResultRfm"></div>
+    </div>
+  </div>
+
+  <div class="card" id="aiSettingsCard">
+    <h2>⚙️ AI 設定（兩個分頁共用）</h2>
+    <p class="card-desc">金鑰只存在你的瀏覽器 localStorage，不會經過任何後端伺服器；只有按下「請 AI 診斷」才會直接連線到你選擇的服務商官方 API。</p>
+    <div class="ai-grid">
+      <div><label for="aiProvider">服務商</label>
+        <select id="aiProvider">
+          <option value="claude">Claude (Anthropic)</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Gemini (Google)</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+      </div>
+      <div><label for="aiModel">模型</label><input type="text" id="aiModel"></div>
+      <div><label for="aiKey">API 金鑰</label><input type="password" id="aiKey" placeholder="貼上你的金鑰"></div>
+    </div>
+  </div>
+</main>
+
+<div id="printReportRoot"></div>
+<div id="pdfWatermark"><img id="wmImg" alt=""></div>
+
+<footer>
+  <div class="wrap">
+    <div class="disclaimer">
+      <strong>使用警語：</strong>本工具僅供教學與內部評估使用，所有試算結果皆為依你輸入變數推算的估計值，不是正式財務報表或專業意見，不能取代會計師、財務顧問或實際數據驗證。RFM 客群分類為業界常見框架的通用設計，並非唯一標準做法。變數設定與 API 金鑰皆只存在你的瀏覽器本機，不會上傳到任何伺服器；按下「請 AI 診斷」時，你的試算資料會直接送到你選擇的服務商官方 API。完整使用說明與創作者資料請見<a href="manual.html">操作手冊</a>。
+    </div>
+    <div class="footer-row">
+      <span>製作：Mark Tsai｜<a href="mailto:tsaimark@gmail.com" style="color:var(--text-faint);">tsaimark@gmail.com</a></span>
+      <span class="footer-links">
+        <img class="visitor-badge" src="https://visitor-badge.laobi.icu/badge?page_id=m255525.privatedomainrfmstudio" alt="訪客次數" style="vertical-align:middle;height:20px;">
+        <span>頁尾另有 <a href="manual.html">操作手冊</a></span>
+      </span>
+    </div>
+  </div>
+</footer>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+
+<script>
+(function(){
+"use strict";
+function $(id){ return document.getElementById(id); }
+function sum(arr){ return arr.reduce(function(a,b){ return a+b; }, 0); }
+function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+function fmtInt(n){ if(n==null || isNaN(n)) return "-"; return Math.round(n).toLocaleString("zh-TW"); }
+function fmtMoney(n){ if(n==null || isNaN(n)) return "-"; return (n<0?"-NT$":"NT$") + fmtInt(Math.abs(n)); }
+function fmtPct1(x){ if(x==null || isNaN(x)) return "-"; return (x*100).toFixed(1) + "%"; }
+function escapeHtml(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function padStart2(n){ return String(n).length<2 ? "0"+n : String(n); }
+function isoDate(d){ return d.getFullYear() + "-" + padStart2(d.getMonth()+1) + "-" + padStart2(d.getDate()); }
+function parseIsoDate(s){
+  if(!s) return null;
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s).trim());
+  if(!m) { var d2 = new Date(s); return isNaN(d2.getTime()) ? null : new Date(d2.getFullYear(), d2.getMonth(), d2.getDate()); }
+  return new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+}
+function showToast(msg){
+  var t = $("toast"); if(!t){ window.alert(msg); return; }
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(function(){ t.classList.remove("show"); }, 2600);
+}
+
+var chartInstances = {};
+function renderChart(canvasId, config){
+  var canvas = $(canvasId); if(!canvas) return;
+  if(chartInstances[canvasId]) chartInstances[canvasId].destroy();
+  chartInstances[canvasId] = new Chart(canvas.getContext("2d"), config);
+}
+var CHART_TEXT_COLOR = "#A6ACC9";
+var CHART_GRID_COLOR = "rgba(166,172,201,0.15)";
+if(window.Chart){
+  Chart.defaults.color = CHART_TEXT_COLOR;
+  Chart.defaults.font.family = "'Noto Sans TC', sans-serif";
+  Chart.defaults.borderColor = CHART_GRID_COLOR;
+}
+
+/* =====================================================================
+   PART A：私域流量效益試算
+   ===================================================================== */
+var SCENARIO_KEYS = ["optimistic","normal","pessimistic"];
+var SCENARIO_LABELS = {optimistic:"樂觀方案", normal:"一般方案", pessimistic:"悲觀方案"};
+var SCENARIO_COLORS = {optimistic:"#3ECF8E", normal:"#7C6FF0", pessimistic:"#F0576B"};
+
+function makeScenario(annualFee,newSubs,retention,acqCost,costRate){
+  return {annualFee:annualFee, newSubs:newSubs, retention:retention, acqCost:acqCost, costRate:costRate};
+}
+function cloneScenarios(scns){ return JSON.parse(JSON.stringify(scns)); }
+
+var TRAFFIC_PRESETS = [
+  { id:"saas", label:"雲端筆記訂閱服務", scenarios:{
+      optimistic:makeScenario(1200,500,0.80,600,0.08),
+      normal:makeScenario(1200,500,0.65,600,0.08),
+      pessimistic:makeScenario(1200,500,0.45,600,0.08)
+  }},
+  { id:"course", label:"線上課程訂閱方案", scenarios:{
+      optimistic:makeScenario(2400,150,0.75,1500,0.10),
+      normal:makeScenario(2400,150,0.55,1500,0.10),
+      pessimistic:makeScenario(2400,150,0.35,1500,0.10)
+  }},
+  { id:"gym", label:"健身房會籍方案", scenarios:{
+      optimistic:makeScenario(6000,80,0.70,2500,0.12),
+      normal:makeScenario(6000,80,0.50,2500,0.12),
+      pessimistic:makeScenario(6000,80,0.30,2500,0.12)
+  }},
+  { id:"restaurant", label:"餐飲會員訂閱箱", scenarios:{
+      optimistic:makeScenario(1800,200,0.65,800,0.15),
+      normal:makeScenario(1800,200,0.45,800,0.15),
+      pessimistic:makeScenario(1800,200,0.25,800,0.15)
+  }},
+  { id:"beautybox", label:"美妝訂閱電商箱", scenarios:{
+      optimistic:makeScenario(2160,300,0.60,900,0.20),
+      normal:makeScenario(2160,300,0.42,900,0.20),
+      pessimistic:makeScenario(2160,300,0.25,900,0.20)
+  }}
+];
+
+function cohortDecay(newSubs, retention, years){
+  var arr = [newSubs];
+  for(var i=1;i<years;i++){ arr.push(arr[i-1]*retention); }
+  return arr;
+}
+function singleCohortModel(scn, years){
+  var subs = cohortDecay(scn.newSubs, scn.retention, years);
+  var revenue = subs.map(function(s){ return s*scn.annualFee; });
+  var opCost = revenue.map(function(r){ return r*scn.costRate; });
+  var marketing = subs.map(function(s,i){ return i===0 ? scn.newSubs*scn.acqCost : 0; });
+  var netProfit = revenue.map(function(r,i){ return r - opCost[i] - marketing[i]; });
+  return {
+    subs:subs, revenue:revenue, opCost:opCost, marketing:marketing, netProfit:netProfit,
+    totals:{ subs:sum(subs), revenue:sum(revenue), opCost:sum(opCost), marketing:sum(marketing), netProfit:sum(netProfit) }
+  };
+}
+function stackedGrowthModel(scn, years){
+  var members=[], revenue=[], opCost=[], marketing=[], netProfit=[], prev=0;
+  for(var y=0;y<years;y++){
+    var m = y===0 ? scn.newSubs : prev*scn.retention + scn.newSubs;
+    var rev = m*scn.annualFee, oc = rev*scn.costRate, mk = scn.newSubs*scn.acqCost;
+    members.push(m); revenue.push(rev); opCost.push(oc); marketing.push(mk); netProfit.push(rev-oc-mk);
+    prev = m;
+  }
+  return {members:members, revenue:revenue, opCost:opCost, marketing:marketing, netProfit:netProfit};
+}
+function oneTimeMarketingModel(scn){
+  var revenue = scn.newSubs*scn.annualFee;
+  var opCost = revenue*scn.costRate;
+  var marketing = scn.newSubs*scn.acqCost;
+  return {revenue:revenue, opCost:opCost, marketing:marketing, netProfit:revenue-opCost-marketing};
+}
+function sensitivityGrid(scn, years){
+  var newSubsMults=[0.5,0.75,1,1.5];
+  var acqCostMults=[0.75,0.9,1,1.25];
+  var colHeaders = newSubsMults.map(function(nm){ return Math.max(1,Math.round(scn.newSubs*nm)); });
+  var rows = acqCostMults.map(function(am){
+    var acqCost = Math.round(scn.acqCost*am);
+    var cells = colHeaders.map(function(newSubs){
+      var s2 = makeScenario(scn.annualFee, newSubs, scn.retention, acqCost, scn.costRate);
+      var m = singleCohortModel(s2, years);
+      return m.totals.netProfit;
+    });
+    return {acqCost:acqCost, cells:cells};
+  });
+  return {colHeaders:colHeaders, rows:rows};
+}
+
+var TRAFFIC_STORAGE_KEY = "pdrfmTrafficState";
+var trafficState = { presetId: null, presetLabel:"", scenarios: null, activeScenario: "normal" };
+
+function loadTrafficState(){
+  var loaded = false;
+  try{
+    var raw = JSON.parse(localStorage.getItem(TRAFFIC_STORAGE_KEY) || "null");
+    if(raw && raw.scenarios){ trafficState = raw; loaded = true; }
+  }catch(e){}
+  if(!loaded){ applyTrafficPreset(TRAFFIC_PRESETS[0], true); return; }
+  buildScenarioUI();
+  syncTrafficExampleUI();
+  recalcTraffic();
+}
+function persistTrafficState(){
+  try{ localStorage.setItem(TRAFFIC_STORAGE_KEY, JSON.stringify(trafficState)); }catch(e){}
+}
+function applyTrafficPreset(preset, silent){
+  trafficState.presetId = preset.id;
+  trafficState.presetLabel = preset.label;
+  trafficState.scenarios = cloneScenarios(preset.scenarios);
+  trafficState.activeScenario = "normal";
+  persistTrafficState();
+  buildScenarioUI();
+  syncTrafficExampleUI();
+  recalcTraffic();
+  if(!silent) showToast("已套用範例：" + preset.label);
+}
+function clearActiveTrafficPreset(){
+  trafficState.presetId = null;
+  syncTrafficExampleUI();
+}
+function syncTrafficExampleUI(){
+  document.querySelectorAll("#trafficExampleRow .pill").forEach(function(b){
+    b.classList.toggle("active", b.dataset.id === trafficState.presetId);
+  });
+}
+function buildTrafficExampleUI(){
+  var row = $("trafficExampleRow");
+  row.innerHTML = "";
+  TRAFFIC_PRESETS.forEach(function(p){
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "pill"; b.dataset.id = p.id; b.textContent = p.label;
+    b.addEventListener("click", function(){ applyTrafficPreset(p); });
+    row.appendChild(b);
+  });
+}
+
+function buildScenarioUI(){
+  var selRow = $("scnSelectRow");
+  selRow.innerHTML = "";
+  SCENARIO_KEYS.forEach(function(k){
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "scn-btn" + (trafficState.activeScenario===k ? " active" : "");
+    b.dataset.scn = k; b.textContent = SCENARIO_LABELS[k];
+    b.addEventListener("click", function(){
+      trafficState.activeScenario = k;
+      persistTrafficState();
+      document.querySelectorAll(".scn-btn").forEach(function(x){ x.classList.toggle("active", x.dataset.scn===k); });
+      recalcTraffic();
+    });
+    selRow.appendChild(b);
+  });
+
+  var tbody = $("scnTableBody");
+  tbody.innerHTML = "";
+  var fields = [
+    {key:"annualFee", pct:false},
+    {key:"newSubs", pct:false},
+    {key:"retention", pct:true},
+    {key:"acqCost", pct:false},
+    {key:"costRate", pct:true}
+  ];
+  SCENARIO_KEYS.forEach(function(k){
+    var tr = document.createElement("tr");
+    var th = document.createElement("td");
+    th.textContent = SCENARIO_LABELS[k];
+    th.style.color = SCENARIO_COLORS[k]; th.style.fontWeight = "700";
+    tr.appendChild(th);
+    fields.forEach(function(f){
+      var td = document.createElement("td");
+      var input = document.createElement("input");
+      input.type = "number"; input.step = f.pct ? "1" : "any";
+      input.dataset.scn = k; input.dataset.field = f.key;
+      var v = trafficState.scenarios[k][f.key];
+      input.value = f.pct ? Math.round(v*100) : v;
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+$("scnTableBody") && $("scnTableBody").addEventListener("input", function(e){
+  var input = e.target.closest("input"); if(!input) return;
+  var val = parseFloat(input.value);
+  if(isNaN(val)) return;
+  var field = input.dataset.field;
+  if(field === "retention" || field === "costRate") val = val/100;
+  trafficState.scenarios[input.dataset.scn][field] = val;
+  clearActiveTrafficPreset();
+  persistTrafficState();
+  recalcTraffic();
+});
+
+function currentScenario(){ return trafficState.scenarios[trafficState.activeScenario]; }
+
+function renderCompareSection(scn){
+  var oneTime = oneTimeMarketingModel(scn);
+  var cohort5 = singleCohortModel(scn, 5);
+  var perPersonOneTime = oneTime.netProfit / scn.newSubs;
+  var perPersonCohort = cohort5.totals.netProfit / scn.newSubs;
+
+  $("compareKpiRow").innerHTML = "";
+  [
+    {label:"一般行銷 單年淨利", value:fmtMoney(oneTime.netProfit), bad:oneTime.netProfit<0},
+    {label:"私域流量 5年累計淨利", value:fmtMoney(cohort5.totals.netProfit), bad:cohort5.totals.netProfit<0},
+    {label:"一般行銷 平均淨利/人", value:fmtMoney(perPersonOneTime), bad:perPersonOneTime<0},
+    {label:"私域流量 平均淨利/人(5年)", value:fmtMoney(perPersonCohort), bad:perPersonCohort<0}
+  ].forEach(function(k){
+    var d = document.createElement("div"); d.className = "kpi-card";
+    d.innerHTML = '<div class="kpi-label">'+escapeHtml(k.label)+'</div><div class="kpi-value '+(k.bad?"bad":"good")+'">'+k.value+'</div>';
+    $("compareKpiRow").appendChild(d);
+  });
+
+  var rows = [
+    ["營收", fmtMoney(oneTime.revenue), fmtMoney(cohort5.totals.revenue)],
+    ["營業成本", fmtMoney(oneTime.opCost), fmtMoney(cohort5.totals.opCost)],
+    ["行銷（招攬）成本", fmtMoney(oneTime.marketing), fmtMoney(cohort5.totals.marketing)],
+    ["淨利", fmtMoney(oneTime.netProfit), fmtMoney(cohort5.totals.netProfit)]
+  ];
+  var html = '<thead><tr><th>項目</th><th>一般行銷(單年)</th><th>私域流量(5年合計)</th></tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    html += '<tr class="'+(i===3?"total":"")+'"><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>';
+  });
+  html += '</tbody>';
+  $("compareTable").innerHTML = html;
+
+  renderChart("compareChart", {
+    type:"bar",
+    data:{
+      labels:["營收","營業成本","行銷成本","淨利"],
+      datasets:[
+        {label:"一般行銷(單年)", data:[oneTime.revenue,oneTime.opCost,oneTime.marketing,oneTime.netProfit], backgroundColor:"#7C6FF0"},
+        {label:"私域流量(5年合計)", data:[cohort5.totals.revenue,cohort5.totals.opCost,cohort5.totals.marketing,cohort5.totals.netProfit], backgroundColor:"#2FD1C0"}
+      ]
+    },
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom"}}, scales:{x:{grid:{color:CHART_GRID_COLOR}}, y:{grid:{color:CHART_GRID_COLOR}}}}
+  });
+}
+
+function renderCohortSection(scn){
+  $("cohortNewSubsLabel").textContent = fmtInt(scn.newSubs);
+  var m = singleCohortModel(scn, 5);
+  var labels = ["第1年","第2年","第3年","第4年","第5年","5年合計"];
+  var rowsDef = [
+    {label:"存活訂閱數", vals:m.subs.concat([m.totals.subs]), fmt:fmtInt},
+    {label:"當年營收", vals:m.revenue.concat([m.totals.revenue]), fmt:fmtMoney},
+    {label:"當年營業成本", vals:m.opCost.concat([m.totals.opCost]), fmt:fmtMoney},
+    {label:"行銷（招攬）成本", vals:m.marketing.concat([m.totals.marketing]), fmt:fmtMoney},
+    {label:"當年淨利", vals:m.netProfit.concat([m.totals.netProfit]), fmt:fmtMoney, isNet:true}
+  ];
+  var html = '<thead><tr><th>項目</th>' + labels.map(function(l){ return "<th>"+l+"</th>"; }).join("") + '</tr></thead><tbody>';
+  rowsDef.forEach(function(r){
+    html += '<tr class="'+(r.isNet?"total":"")+'"><td>'+r.label+'</td>' + r.vals.map(function(v){ return "<td>"+r.fmt(v)+"</td>"; }).join("") + '</tr>';
+  });
+  html += '</tbody>';
+  $("cohortTable").innerHTML = html;
+}
+
+function renderGrowthChart(scn){
+  var years = 6;
+  var g = stackedGrowthModel(scn, years);
+  var labels = g.members.map(function(_,i){ return "第"+(i+1)+"年"; });
+  renderChart("growthChart", {
+    type:"line",
+    data:{ labels:labels, datasets:[
+      {label:"活躍會員數", data:g.members, borderColor:"#7C6FF0", backgroundColor:"rgba(124,111,240,.15)", yAxisID:"y", tension:.3, fill:true},
+      {label:"當年淨利(NT$)", data:g.netProfit, borderColor:"#2FD1C0", backgroundColor:"rgba(47,209,192,.1)", yAxisID:"y1", tension:.3}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom"}},
+      scales:{
+        y:{position:"left", title:{display:true,text:"會員數"}, grid:{color:CHART_GRID_COLOR}},
+        y1:{position:"right", title:{display:true,text:"淨利(NT$)"}, grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+}
+
+function renderRetentionCompare(scn){
+  var years = 6;
+  var rets = [0.5,0.7,0.9];
+  var colors = ["#F0576B","#F0B429","#3ECF8E"];
+  var labels = null;
+  var membersDatasets = [], profitDatasets = [];
+  rets.forEach(function(r,i){
+    var s2 = makeScenario(scn.annualFee, scn.newSubs, r, scn.acqCost, scn.costRate);
+    var g = stackedGrowthModel(s2, years);
+    if(!labels) labels = g.members.map(function(_,idx){ return "第"+(idx+1)+"年"; });
+    membersDatasets.push({label:"續訂率 "+Math.round(r*100)+"%", data:g.members, borderColor:colors[i], backgroundColor:"transparent", tension:.3});
+    profitDatasets.push({label:"續訂率 "+Math.round(r*100)+"%", data:g.netProfit, borderColor:colors[i], backgroundColor:"transparent", tension:.3});
+  });
+  renderChart("retentionMembersChart", { type:"line", data:{labels:labels, datasets:membersDatasets},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom"}}, scales:{y:{grid:{color:CHART_GRID_COLOR}}}} });
+  renderChart("retentionProfitChart", { type:"line", data:{labels:labels, datasets:profitDatasets},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom"}}, scales:{y:{grid:{color:CHART_GRID_COLOR}}}} });
+}
+
+function colorForRatio(t){
+  t = clamp(t,0,1);
+  var bad = [240,87,107], good=[62,207,142];
+  var r = Math.round(bad[0] + (good[0]-bad[0])*t);
+  var g = Math.round(bad[1] + (good[1]-bad[1])*t);
+  var b = Math.round(bad[2] + (good[2]-bad[2])*t);
+  return "rgb("+r+","+g+","+b+")";
+}
+function renderSensitivity(scn){
+  var grid = sensitivityGrid(scn, 5);
+  var allVals = [];
+  grid.rows.forEach(function(r){ r.cells.forEach(function(v){ allVals.push(v); }); });
+  var min = Math.min.apply(null, allVals), max = Math.max.apply(null, allVals);
+  var html = '<thead><tr><th class="corner">招攬成本 ＼ 新訂戶數</th>' + grid.colHeaders.map(function(c){ return "<th>"+fmtInt(c)+" 人</th>"; }).join("") + '</tr></thead><tbody>';
+  grid.rows.forEach(function(row){
+    html += "<tr><th>"+fmtMoney(row.acqCost)+"</th>";
+    row.cells.forEach(function(v){
+      var t = max===min ? 1 : (v-min)/(max-min);
+      html += '<td style="background:'+colorForRatio(t)+'">'+fmtMoney(v)+'</td>';
+    });
+    html += "</tr>";
+  });
+  html += "</tbody>";
+  $("sensitivityTable").innerHTML = html;
+}
+
+function recalcTraffic(){
+  var scn = currentScenario();
+  renderCompareSection(scn);
+  renderCohortSection(scn);
+  renderGrowthChart(scn);
+  renderRetentionCompare(scn);
+  renderSensitivity(scn);
+}
+
+/* =====================================================================
+   PART B：RFM 顧客分群分析
+   ===================================================================== */
+var SEGMENTS = [
+  {key:"HHH", label:"重要價值客戶", color:"#F0B429"},
+  {key:"HHL", label:"重要發展客戶", color:"#B98CE0"},
+  {key:"HLH", label:"重要保持客戶", color:"#2FD1C0"},
+  {key:"HLL", label:"重要挽留客戶", color:"#F08A3C"},
+  {key:"LHH", label:"一般價值客戶", color:"#5B8DEF"},
+  {key:"LHL", label:"一般發展客戶", color:"#7FD9CE"},
+  {key:"LLH", label:"一般保持客戶", color:"#8B93B8"},
+  {key:"LLL", label:"流失風險客戶", color:"#F0576B"}
+];
+var SEGMENT_MAP = {}; SEGMENTS.forEach(function(s){ SEGMENT_MAP[s.key] = s; });
+
+function daysBetween(later, earlier){ return Math.round((later.getTime()-earlier.getTime())/86400000); }
+function tieAwareRank(values, x){
+  var less=0, equal=0;
+  for(var i=0;i<values.length;i++){ if(values[i]<x) less++; else if(values[i]===x) equal++; }
+  return less + (equal+1)/2;
+}
+function scoreFromValue(values, x, reverse){
+  var n = values.length;
+  if(n<=1) return 10;
+  var rank = tieAwareRank(values, x);
+  var pct = (rank-1)/(n-1);
+  if(reverse) pct = 1-pct;
+  return clamp(Math.round(1+9*pct), 1, 10);
+}
+function segmentKey(rScore,fScore,mScore){
+  return (rScore>=6?"H":"L") + (fScore>=6?"H":"L") + (mScore>=6?"H":"L");
+}
+function computeRfm(customers, baseDate){
+  var valid = customers.filter(function(c){
+    return c.lastPurchaseDate && !isNaN(c.frequency) && !isNaN(c.monetary) && parseIsoDate(c.lastPurchaseDate);
+  });
+  var rArr = valid.map(function(c){ return daysBetween(baseDate, parseIsoDate(c.lastPurchaseDate)); });
+  var fArr = valid.map(function(c){ return Number(c.frequency); });
+  var mArr = valid.map(function(c){ return Number(c.monetary); });
+  return valid.map(function(c,i){
+    var r1 = rArr[i];
+    var rScore = scoreFromValue(rArr, r1, true);
+    var fScore = scoreFromValue(fArr, Number(c.frequency), false);
+    var mScore = scoreFromValue(mArr, Number(c.monetary), false);
+    var seg = SEGMENT_MAP[segmentKey(rScore,fScore,mScore)];
+    return {
+      id:c.id, lastPurchaseDate:c.lastPurchaseDate, recencyDays:r1,
+      frequency:Number(c.frequency), monetary:Number(c.monetary),
+      rScore:rScore, fScore:fScore, mScore:mScore, segment:seg
+    };
+  });
+}
+
+function generateFictionalCustomers(prefix, n, monetaryBase, baseDate){
+  var list = [];
+  for(var i=0;i<n;i++){
+    var recencyDays = 5 + ((i*37) % 380);
+    var frequency = 1 + ((i*7) % 19);
+    var monetaryFactor = 0.2 + (((i*13) % 97)/97) * 1.8;
+    var monetary = Math.round(monetaryBase * monetaryFactor / 100) * 100;
+    var d = new Date(baseDate.getTime());
+    d.setDate(d.getDate() - recencyDays);
+    list.push({ id: prefix + "-" + (i+1<10?"00":i+1<100?"0":"") + (i+1), lastPurchaseDate: isoDate(d), frequency: frequency, monetary: monetary });
+  }
+  return list;
+}
+var RFM_PRESETS = [
+  {id:"coffee", label:"咖啡訂閱會員", prefix:"COF", n:24, monetaryBase:1500},
+  {id:"fitness", label:"線上健身課程", prefix:"FIT", n:24, monetaryBase:3000},
+  {id:"beauty", label:"美妝保養電商", prefix:"BTY", n:24, monetaryBase:2200},
+  {id:"electronics", label:"3C配件網店", prefix:"ELEC", n:22, monetaryBase:2600},
+  {id:"pet", label:"寵物用品訂閱", prefix:"PET", n:22, monetaryBase:1800}
+];
+
+var RFM_STORAGE_KEY = "pdrfmRfmState";
+var rfmState = { presetId:null, baseDate: isoDate(new Date()), customers: [] };
+
+function loadRfmState(){
+  var loaded = false;
+  try{
+    var raw = JSON.parse(localStorage.getItem(RFM_STORAGE_KEY) || "null");
+    if(raw && raw.customers && raw.customers.length){ rfmState = raw; loaded = true; }
+  }catch(e){}
+  if(!loaded){ applyRfmPreset(RFM_PRESETS[0], true); return; }
+  syncRfmExampleUI();
+  renderCustomerTable();
+  recalcRfm();
+}
+function persistRfmState(){
+  try{ localStorage.setItem(RFM_STORAGE_KEY, JSON.stringify(rfmState)); }catch(e){}
+}
+function applyRfmPreset(preset, silent){
+  rfmState.presetId = preset.id;
+  rfmState.baseDate = isoDate(new Date());
+  rfmState.customers = generateFictionalCustomers(preset.prefix, preset.n, preset.monetaryBase, new Date());
+  persistRfmState();
+  syncRfmExampleUI();
+  renderCustomerTable();
+  $("rfmBaseDate").value = rfmState.baseDate;
+  recalcRfm();
+  if(!silent) showToast("已套用範例：" + preset.label);
+}
+function syncRfmExampleUI(){
+  document.querySelectorAll("#rfmExampleRow .pill").forEach(function(b){
+    b.classList.toggle("active", b.dataset.id === rfmState.presetId);
+  });
+}
+function buildRfmExampleUI(){
+  var row = $("rfmExampleRow");
+  row.innerHTML = "";
+  RFM_PRESETS.forEach(function(p){
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "pill pill-rfm"; b.dataset.id = p.id; b.textContent = p.label;
+    b.addEventListener("click", function(){ applyRfmPreset(p); });
+    row.appendChild(b);
+  });
+}
+
+function renderCustomerTable(){
+  var tbody = $("customerTableBody");
+  tbody.innerHTML = "";
+  rfmState.customers.forEach(function(c, idx){
+    var tr = document.createElement("tr");
+    tr.dataset.idx = idx;
+    tr.innerHTML =
+      '<td><input type="text" data-field="id" value="'+escapeHtml(c.id)+'"></td>' +
+      '<td><input type="date" data-field="lastPurchaseDate" value="'+escapeHtml(c.lastPurchaseDate||"")+'"></td>' +
+      '<td><input type="number" data-field="frequency" min="0" step="1" value="'+(c.frequency==null?"":c.frequency)+'"></td>' +
+      '<td><input type="number" data-field="monetary" min="0" step="1" value="'+(c.monetary==null?"":c.monetary)+'"></td>' +
+      '<td><button type="button" class="row-del-btn" data-action="del">✕</button></td>';
+    tbody.appendChild(tr);
+  });
+}
+$("customerTableBody") && $("customerTableBody").addEventListener("input", function(e){
+  var input = e.target.closest("input"); if(!input) return;
+  var tr = input.closest("tr"); var idx = parseInt(tr.dataset.idx,10);
+  var field = input.dataset.field;
+  var val = (field==="frequency"||field==="monetary") ? parseFloat(input.value) : input.value;
+  rfmState.customers[idx][field] = val;
+  rfmState.presetId = null; syncRfmExampleUI();
+  persistRfmState();
+  recalcRfm();
+});
+$("customerTableBody") && $("customerTableBody").addEventListener("click", function(e){
+  var btn = e.target.closest("button[data-action=del]"); if(!btn) return;
+  var tr = btn.closest("tr"); var idx = parseInt(tr.dataset.idx,10);
+  rfmState.customers.splice(idx,1);
+  rfmState.presetId = null; syncRfmExampleUI();
+  persistRfmState();
+  renderCustomerTable();
+  recalcRfm();
+});
+$("addCustomerBtn") && $("addCustomerBtn").addEventListener("click", function(){
+  rfmState.customers.push({ id:"新客戶"+(rfmState.customers.length+1), lastPurchaseDate: rfmState.baseDate, frequency:1, monetary:0 });
+  rfmState.presetId = null; syncRfmExampleUI();
+  persistRfmState();
+  renderCustomerTable();
+  recalcRfm();
+});
+$("rfmBaseDate") && $("rfmBaseDate").addEventListener("change", function(){
+  rfmState.baseDate = $("rfmBaseDate").value || isoDate(new Date());
+  persistRfmState();
+  recalcRfm();
+});
+
+function renderSegmentKpi(rows){
+  var total = rows.length;
+  $("segmentKpiRow").innerHTML = "";
+  [
+    {label:"客戶總數", value: fmtInt(total)},
+    {label:"平均消費金額", value: fmtMoney(total? sum(rows.map(function(r){return r.monetary;}))/total : 0)},
+    {label:"平均購買次數", value: total? (sum(rows.map(function(r){return r.frequency;}))/total).toFixed(1) : "0"},
+    {label:"重要價值客戶佔比", value: fmtPct1(total? rows.filter(function(r){return r.segment.key==="HHH";}).length/total : 0)}
+  ].forEach(function(k){
+    var d = document.createElement("div"); d.className = "kpi-card";
+    d.innerHTML = '<div class="kpi-label">'+escapeHtml(k.label)+'</div><div class="kpi-value">'+k.value+'</div>';
+    $("segmentKpiRow").appendChild(d);
+  });
+}
+function renderSegmentChart(rows){
+  var counts = SEGMENTS.map(function(s){ return rows.filter(function(r){ return r.segment.key===s.key; }).length; });
+  renderChart("segmentChart", {
+    type:"bar",
+    data:{ labels:SEGMENTS.map(function(s){return s.label;}), datasets:[{label:"客戶數", data:counts, backgroundColor:SEGMENTS.map(function(s){return s.color;})}] },
+    options:{ responsive:true, maintainAspectRatio:false, indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{grid:{color:CHART_GRID_COLOR}}, y:{grid:{display:false}}} }
+  });
+}
+function renderScatterChart(rows){
+  var datasets = SEGMENTS.map(function(s){
+    return {
+      label:s.label,
+      data: rows.filter(function(r){ return r.segment.key===s.key; }).map(function(r){ return {x:r.monetary, y:r.frequency}; }),
+      backgroundColor:s.color
+    };
+  });
+  renderChart("scatterChart", {
+    type:"scatter",
+    data:{ datasets:datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:"bottom", labels:{boxWidth:10, font:{size:10}}}},
+      scales:{ x:{title:{display:true,text:"累計消費金額(M)"}, grid:{color:CHART_GRID_COLOR}}, y:{title:{display:true,text:"購買次數(F)"}, grid:{color:CHART_GRID_COLOR}} }
+    }
+  });
+}
+function renderRfmDetailTable(rows){
+  var html = '<thead><tr><th>客戶代號</th><th>最近購買日期</th><th>Recency(天)</th><th>F</th><th>M</th><th>R分</th><th>F分</th><th>M分</th><th>客群</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html += '<tr><td>'+escapeHtml(r.id)+'</td><td>'+escapeHtml(r.lastPurchaseDate)+'</td><td>'+fmtInt(r.recencyDays)+
+      '</td><td>'+fmtInt(r.frequency)+'</td><td>'+fmtMoney(r.monetary)+'</td><td>'+r.rScore+'</td><td>'+r.fScore+'</td><td>'+r.mScore+
+      '</td><td><span class="seg-badge" style="background:'+r.segment.color+'">'+r.segment.label+'</span></td></tr>';
+  });
+  html += '</tbody>';
+  $("rfmDetailTable").innerHTML = html;
+}
+
+var lastRfmRows = [];
+function recalcRfm(){
+  var baseDate = parseIsoDate(rfmState.baseDate) || new Date();
+  lastRfmRows = computeRfm(rfmState.customers, baseDate);
+  renderSegmentKpi(lastRfmRows);
+  renderSegmentChart(lastRfmRows);
+  renderScatterChart(lastRfmRows);
+  renderRfmDetailTable(lastRfmRows);
+}
+
+/* =====================================================================
+   PART C：CSV / Excel 上傳下載（RFM 客戶清單）
+   ===================================================================== */
+var CSV_FIELD_ALIASES = {
+  id: ["客戶代號","客戶編號","顧客代號","customerid","id"],
+  lastPurchaseDate: ["最近購買日期","最後購買日期","購買日期","lastpurchasedate","date"],
+  frequency: ["購買次數","訂單次數","次數","frequency","f"],
+  monetary: ["累計消費金額","消費金額","金額","monetary","m"]
+};
+function normalizeHeader(h){ return String(h==null?"":h).trim().toLowerCase().replace(/[\s()（）]/g,""); }
+function mapHeaders(headers){
+  var map = {};
+  headers.forEach(function(h, idx){
+    var nh = normalizeHeader(h);
+    Object.keys(CSV_FIELD_ALIASES).forEach(function(field){
+      if(map[field] != null) return;
+      var aliases = CSV_FIELD_ALIASES[field].map(normalizeHeader);
+      if(aliases.indexOf(nh) !== -1) map[field] = idx;
+    });
+  });
+  return map;
+}
+function rowsFromAoa(aoa){
+  if(!aoa || !aoa.length) return [];
+  var headers = aoa[0];
+  var map = mapHeaders(headers);
+  var out = [];
+  for(var i=1;i<aoa.length;i++){
+    var row = aoa[i]; if(!row || !row.length) continue;
+    var idVal = map.id!=null ? row[map.id] : null;
+    if(idVal == null || idVal === "") continue;
+    var dateVal = map.lastPurchaseDate!=null ? row[map.lastPurchaseDate] : null;
+    var dateStr = "";
+    if(dateVal instanceof Date) dateStr = isoDate(dateVal);
+    else if(dateVal){ var pd = parseIsoDate(dateVal); dateStr = pd ? isoDate(pd) : ""; }
+    out.push({
+      id: String(idVal),
+      lastPurchaseDate: dateStr,
+      frequency: map.frequency!=null ? parseFloat(row[map.frequency]) || 0 : 0,
+      monetary: map.monetary!=null ? parseFloat(row[map.monetary]) || 0 : 0
+    });
+  }
+  return out;
+}
+function loadCsvLibs(){
+  return new Promise(function(resolve){
+    function check(){
+      if(window.Papa && window.XLSX) resolve();
+      else setTimeout(check, 100);
+    }
+    check();
+  });
+}
+$("uploadCsvBtn") && $("uploadCsvBtn").addEventListener("click", function(){ $("csvFileInput").click(); });
+$("csvFileInput") && $("csvFileInput").addEventListener("change", function(e){
+  var file = e.target.files && e.target.files[0]; if(!file) return;
+  loadCsvLibs().then(function(){
+    var name = file.name.toLowerCase();
+    if(name.endsWith(".csv")){
+      Papa.parse(file, { complete:function(res){
+        var rows = rowsFromAoa(res.data);
+        if(!rows.length){ showToast("找不到可辨識的欄位，請確認標題列"); return; }
+        rfmState.customers = rows; rfmState.presetId = null;
+        persistRfmState(); syncRfmExampleUI(); renderCustomerTable(); recalcRfm();
+        showToast("已匯入 " + rows.length + " 筆客戶資料");
+      }});
+    } else if(name.endsWith(".xlsx") || name.endsWith(".xls")){
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        var wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array", cellDates:true});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true});
+        var rows = rowsFromAoa(aoa);
+        if(!rows.length){ showToast("找不到可辨識的欄位，請確認標題列"); return; }
+        rfmState.customers = rows; rfmState.presetId = null;
+        persistRfmState(); syncRfmExampleUI(); renderCustomerTable(); recalcRfm();
+        showToast("已匯入 " + rows.length + " 筆客戶資料");
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      showToast("不支援的檔案格式，請上傳 .csv、.xlsx 或 .xls 檔案");
+    }
+  });
+  e.target.value = "";
+});
+$("downloadCsvBtn") && $("downloadCsvBtn").addEventListener("click", function(){
+  var lines = ["客戶代號,最近購買日期,購買次數,累計消費金額"];
+  rfmState.customers.forEach(function(c){
+    lines.push([c.id, c.lastPurchaseDate, c.frequency, c.monetary].join(","));
+  });
+  var blob = new Blob(["﻿" + lines.join("\r\n")], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = "RFM客戶清單.csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+/* =====================================================================
+   PART D：Tabs
+   ===================================================================== */
+function initTabs(){
+  var panels = { traffic:"panelTraffic", rfm:"panelRfm" };
+  $("tabNav").addEventListener("click", function(e){
+    var btn = e.target.closest(".tab-btn"); if(!btn) return;
+    document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b===btn); });
+    Object.keys(panels).forEach(function(k){ $(panels[k]).classList.toggle("active", k===btn.dataset.tab); });
+  });
+}
+
+/* =====================================================================
+   PART E：BYOK AI 診斷（兩分頁共用設定，各自獨立 prompt/結果）
+   ===================================================================== */
+var AI_PROVIDERS = {
+  claude:{ label:"Claude", defaultModel:"claude-sonnet-5-5" },
+  openai:{ label:"OpenAI", defaultModel:"gpt-5.1" },
+  gemini:{ label:"Gemini", defaultModel:"gemini-3-pro" },
+  openrouter:{ label:"OpenRouter", defaultModel:"anthropic/claude-sonnet-5.5" }
+};
+var AI_CONFIG_KEY = "pdrfmApiConfig";
+function loadApiConfig(){
+  try{ return JSON.parse(localStorage.getItem(AI_CONFIG_KEY) || "{}"); }catch(e){ return {}; }
+}
+function persistApiConfig(){
+  var cfg = { provider:$("aiProvider").value, model:$("aiModel").value, apiKey:$("aiKey").value };
+  try{ localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(cfg)); }catch(e){}
+}
+function initAiSettings(){
+  var cfg = loadApiConfig();
+  $("aiProvider").value = cfg.provider || "claude";
+  $("aiModel").value = cfg.model || AI_PROVIDERS[$("aiProvider").value].defaultModel;
+  $("aiKey").value = cfg.apiKey || "";
+  $("aiProvider").addEventListener("change", function(){
+    var modelEl = $("aiModel");
+    var isDefault = Object.keys(AI_PROVIDERS).some(function(k){ return AI_PROVIDERS[k].defaultModel === modelEl.value.trim(); });
+    if(!modelEl.value.trim() || isDefault) modelEl.value = AI_PROVIDERS[$("aiProvider").value].defaultModel;
+    persistApiConfig();
+  });
+  $("aiModel").addEventListener("input", persistApiConfig);
+  $("aiKey").addEventListener("input", persistApiConfig);
+}
+
+async function callLLM(provider, model, apiKey, prompt, onRetry){
+  var url, headers, body, extract;
+  if(provider === "claude"){
+    url = "https://api.anthropic.com/v1/messages";
+    headers = {"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"};
+    body = {model:model, max_tokens:2000, messages:[{role:"user", content:prompt}]};
+    extract = function(d){
+      if(d.stop_reason === "refusal") throw new Error("模型拒絕了這個請求（refusal）");
+      var t = (d.content || []).filter(function(b){ return b.type==="text"; }).map(function(b){ return b.text; }).join("");
+      if(!t) throw new Error("回應中沒有文字內容");
+      return t;
+    };
+  } else if(provider === "openai"){
+    url = "https://api.openai.com/v1/chat/completions";
+    headers = {"content-type":"application/json","authorization":"Bearer " + apiKey};
+    body = {model:model, messages:[{role:"user", content:prompt}]};
+    extract = function(d){
+      var t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+      if(!t) throw new Error("回應中沒有文字內容");
+      return t;
+    };
+  } else if(provider === "gemini"){
+    url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
+    headers = {"content-type":"application/json","x-goog-api-key":apiKey};
+    body = {contents:[{parts:[{text:prompt}]}]};
+    extract = function(d){
+      var parts = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || [];
+      var t = parts.map(function(p){ return p.text || ""; }).join("");
+      if(!t) throw new Error("回應中沒有文字內容");
+      return t;
+    };
+  } else if(provider === "openrouter"){
+    url = "https://openrouter.ai/api/v1/chat/completions";
+    headers = {"content-type":"application/json","authorization":"Bearer " + apiKey};
+    body = {model:model, messages:[{role:"user", content:prompt}]};
+    extract = function(d){
+      var t = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+      if(!t) throw new Error("回應中沒有文字內容");
+      return t;
+    };
+  } else { throw new Error("不支援的服務商"); }
+
+  var RETRYABLE = {429:1,500:1,503:1,529:1};
+  var MAX_TRIES = 3;
+  for(var attempt=1; attempt<=MAX_TRIES; attempt++){
+    var resp = await fetch(url, {method:"POST", headers:headers, body:JSON.stringify(body), signal:AbortSignal.timeout(180000)});
+    var raw = await resp.text();
+    if(resp.ok) return extract(JSON.parse(raw));
+    var msg = raw.slice(0,300);
+    try{ var err = JSON.parse(raw); msg = (err.error && err.error.message) || err.message || msg; }catch(e){}
+    if(RETRYABLE[resp.status] && attempt < MAX_TRIES){
+      var waitSec = attempt*8;
+      if(onRetry) onRetry(attempt, resp.status, waitSec);
+      await new Promise(function(r){ setTimeout(r, waitSec*1000); });
+      continue;
+    }
+    if(resp.status===404) msg += "——這通常表示模型名稱錯誤或已停用，請確認目前可用的模型 ID";
+    if(RETRYABLE[resp.status]) msg += "——已自動重試 " + (MAX_TRIES-1) + " 次仍失敗，多為服務商暫時過載，請稍候再試或更換模型／服務商";
+    throw new Error("API 回應 " + resp.status + "：" + msg);
+  }
+}
+
+var AI_PROMPT_PRESETS_TRAFFIC = [
+  {label:"整體健檢", text:"請針對目前的方案設定與試算結果，做一次整體健檢，指出最大的風險與機會。"},
+  {label:"三方案比較", text:"請比較樂觀／一般／悲觀三個方案，說明差異主要來自哪個變數，並給出風險緩解建議。"},
+  {label:"敏感度解讀", text:"請解讀敏感度分析熱力表，指出哪個變數對淨利影響最大，該優先優化哪個環節。"},
+  {label:"提升續訂率策略", text:"請針對目前的續訂率，提出具體可執行的提升續訂率策略建議。"},
+  {label:"募資簡報用語", text:"請把試算結果改寫成適合對投資人／主管報告的募資簡報用語，強調成長潛力。"}
+];
+var AI_PROMPT_PRESETS_RFM = [
+  {label:"整體客群健檢", text:"請針對目前的客群分布做一次整體健檢，指出最需要關注的客群。"},
+  {label:"VIP維繫建議", text:"請針對「重要價值客戶」提出具體的維繫與升級經營建議。"},
+  {label:"流失挽回策略", text:"請針對「流失風險客戶」與「一般挽留客戶」提出具體的挽回策略。"},
+  {label:"行銷預算分配", text:"請依客群分布，建議行銷預算該如何在各客群之間分配。"},
+  {label:"新客轉老客策略", text:"請提出把低頻率、低金額客戶轉化為高頻率忠誠客戶的具體策略。"}
+];
+function buildAiPromptUI(rowId, presets, extraId){
+  var row = $(rowId); row.innerHTML = "";
+  presets.forEach(function(p){
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "pill"; b.textContent = p.label;
+    b.addEventListener("click", function(){ $(extraId).value = p.text; });
+    row.appendChild(b);
+  });
+}
+
+function buildDiagnosisPromptTraffic(){
+  var scn = currentScenario();
+  var oneTime = oneTimeMarketingModel(scn);
+  var cohort5 = singleCohortModel(scn, 5);
+  var growth = stackedGrowthModel(scn, 6);
+  var extra = $("aiExtraTraffic").value.trim();
+  var lines = [];
+  lines.push("你是一位私域流量／訂閱制商業模式顧問，請用繁體中文分析以下試算結果，給出重點解讀與具體建議（500字以內）：");
+  lines.push("目前情境：" + (trafficState.presetLabel || "自訂情境") + "，檢視方案：" + SCENARIO_LABELS[trafficState.activeScenario]);
+  lines.push("方案變數：年訂閱費 NT$" + scn.annualFee + "，新訂戶數 " + scn.newSubs + " 人，續訂率 " + Math.round(scn.retention*100) + "%，平均招攬成本 NT$" + scn.acqCost + "/位，成本率 " + Math.round(scn.costRate*100) + "%");
+  lines.push("一般行銷（單年）：營收 NT$" + Math.round(oneTime.revenue) + "，淨利 NT$" + Math.round(oneTime.netProfit));
+  lines.push("私域流量（同批新戶5年累計）：營收 NT$" + Math.round(cohort5.totals.revenue) + "，淨利 NT$" + Math.round(cohort5.totals.netProfit));
+  lines.push("持續獲客6年疊加模型：第1年會員數 " + Math.round(growth.members[0]) + "，第6年會員數 " + Math.round(growth.members[5]) + "，第1年淨利 NT$" + Math.round(growth.netProfit[0]) + "，第6年淨利 NT$" + Math.round(growth.netProfit[5]));
+  if(extra) lines.push("特別要求：" + extra);
+  return lines.join("\n");
+}
+function buildDiagnosisPromptRfm(){
+  var extra = $("aiExtraRfm").value.trim();
+  var total = lastRfmRows.length;
+  var lines = [];
+  lines.push("你是一位顧客關係管理（CRM）顧問，請用繁體中文分析以下 RFM 客群分布，給出重點解讀與具體行銷建議（500字以內）：");
+  lines.push("客戶總數：" + total);
+  SEGMENTS.forEach(function(s){
+    var rows = lastRfmRows.filter(function(r){ return r.segment.key===s.key; });
+    if(!rows.length) return;
+    var avgM = sum(rows.map(function(r){return r.monetary;}))/rows.length;
+    lines.push(s.label + "：" + rows.length + " 人（" + (total? (rows.length/total*100).toFixed(1):"0") + "%），平均消費 NT$" + Math.round(avgM));
+  });
+  if(extra) lines.push("特別要求：" + extra);
+  return lines.join("\n");
+}
+
+function bindAiButton(btnId, resultId, promptBuilder){
+  $(btnId).addEventListener("click", async function(){
+    var cfg = loadApiConfig();
+    if(!cfg.apiKey){ showToast("請先在下方「AI 設定」填入 API 金鑰"); return; }
+    var resultBox = $(resultId);
+    resultBox.className = "ai-result show";
+    resultBox.innerHTML = '<span class="ai-badge mode-ai">產生中…</span><br>正在請 AI 分析，請稍候（若遇服務商過載會自動重試）…';
+    try{
+      var prompt = promptBuilder();
+      var text = await callLLM(cfg.provider, cfg.model, cfg.apiKey, prompt, function(attempt, status, waitSec){
+        resultBox.innerHTML = '<span class="ai-badge mode-ai">重試中…</span><br>服務商回應 ' + status + '，' + waitSec + ' 秒後自動重試（第 ' + attempt + ' 次）…';
+      });
+      resultBox.innerHTML = '<span class="ai-badge mode-ai">AI 診斷結果</span><br>' + escapeHtml(text).replace(/\n/g,"<br>");
+    }catch(err){
+      resultBox.innerHTML = '<span class="ai-badge mode-err">發生錯誤</span><br>' + escapeHtml(err.message || String(err));
+    }
+  });
+}
+
+/* =====================================================================
+   PART F：PDF 匯出（獨立靜態報表路線）
+   ===================================================================== */
+function nowStr(){
+  var d = new Date();
+  return d.getFullYear()+"/"+padStart2(d.getMonth()+1)+"/"+padStart2(d.getDate())+" "+padStart2(d.getHours())+":"+padStart2(d.getMinutes());
+}
+function buildPrintReportTraffic(){
+  var scn = currentScenario();
+  var oneTime = oneTimeMarketingModel(scn);
+  var cohort5 = singleCohortModel(scn, 5);
+  var html = '<div class="pr-header"><h1>私域流量效益試算報告</h1><div class="pr-meta">情境：'+escapeHtml(trafficState.presetLabel||"自訂情境")+'　方案：'+SCENARIO_LABELS[trafficState.activeScenario]+'　產生時間：'+nowStr()+'</div></div>';
+  html += '<div class="pr-section"><h2>方案變數</h2><table class="pr-table">';
+  html += '<tr><td>年訂閱費</td><td>'+fmtMoney(scn.annualFee)+'</td></tr>';
+  html += '<tr><td>新訂戶數</td><td>'+fmtInt(scn.newSubs)+' 人</td></tr>';
+  html += '<tr><td>續訂率</td><td>'+Math.round(scn.retention*100)+'%</td></tr>';
+  html += '<tr><td>平均招攬成本/位</td><td>'+fmtMoney(scn.acqCost)+'</td></tr>';
+  html += '<tr><td>成本率</td><td>'+Math.round(scn.costRate*100)+'%</td></tr>';
+  html += '</table></div>';
+  html += '<div class="pr-section"><h2>一般行銷 vs 私域流量</h2><table class="pr-table">';
+  html += '<tr><td>一般行銷 單年淨利</td><td>'+fmtMoney(oneTime.netProfit)+'</td></tr>';
+  html += '<tr class="pr-total"><td>私域流量 5年累計淨利</td><td>'+fmtMoney(cohort5.totals.netProfit)+'</td></tr>';
+  html += '</table></div>';
+  var aiText = $("aiResultTraffic").classList.contains("show") ? $("aiResultTraffic").textContent : "";
+  if(aiText) html += '<div class="pr-section"><h2>AI 診斷</h2><div class="pr-ai-text">'+escapeHtml(aiText)+'</div></div>';
+  html += '<div class="pr-footer">本報告由「私域流量與RFM顧客價值分析工作站」產生，所有數字皆為依使用者設定推算的估計值，非正式財務報表。</div>';
+  return html;
+}
+function buildPrintReportRfm(){
+  var html = '<div class="pr-header"><h1>RFM 顧客分群分析報告</h1><div class="pr-meta">基準日：'+escapeHtml(rfmState.baseDate)+'　客戶總數：'+lastRfmRows.length+'　產生時間：'+nowStr()+'</div></div>';
+  html += '<div class="pr-section"><h2>客群分布</h2><table class="pr-table">';
+  SEGMENTS.forEach(function(s){
+    var rows = lastRfmRows.filter(function(r){ return r.segment.key===s.key; });
+    html += '<tr><td>'+s.label+'</td><td>'+rows.length+' 人</td></tr>';
+  });
+  html += '</table></div>';
+  var aiText = $("aiResultRfm").classList.contains("show") ? $("aiResultRfm").textContent : "";
+  if(aiText) html += '<div class="pr-section"><h2>AI 診斷</h2><div class="pr-ai-text">'+escapeHtml(aiText)+'</div></div>';
+  html += '<div class="pr-footer">本報告由「私域流量與RFM顧客價值分析工作站」產生，RFM 客群分類為業界常見框架的通用設計。</div>';
+  return html;
+}
+function printReport(html){ $("printReportRoot").innerHTML = html; window.print(); }
+$("pdfBtnTraffic") && $("pdfBtnTraffic").addEventListener("click", function(){ printReport(buildPrintReportTraffic()); });
+$("pdfBtnRfm") && $("pdfBtnRfm").addEventListener("click", function(){ printReport(buildPrintReportRfm()); });
+
+/* =====================================================================
+   PART G：Init
+   ===================================================================== */
+if($("wmImg")) $("wmImg").src = "watermark-source.png";
+initTabs();
+buildTrafficExampleUI();
+loadTrafficState();
+buildRfmExampleUI();
+loadRfmState();
+$("rfmBaseDate").value = rfmState.baseDate;
+initAiSettings();
+buildAiPromptUI("aiPromptRowTraffic", AI_PROMPT_PRESETS_TRAFFIC, "aiExtraTraffic");
+buildAiPromptUI("aiPromptRowRfm", AI_PROMPT_PRESETS_RFM, "aiExtraRfm");
+bindAiButton("aiDiagnoseBtnTraffic", "aiResultTraffic", buildDiagnosisPromptTraffic);
+bindAiButton("aiDiagnoseBtnRfm", "aiResultRfm", buildDiagnosisPromptRfm);
+})();
+</script>
+
+<script>
+/* ================= 頂部跑馬燈（獨立運作，跟上方主程式邏輯無關；共用工作區既有的公告 Google Sheet） ================= */
+(function () {
+  "use strict";
+  var MARQUEE_CHECK_URL = "https://script.google.com/macros/s/AKfycbwKX0DNNbY8y4nf90BFTHtxgfqJcHHcZasRrgycl4QAe52_hkjMWSkYk4xOsqU-JPCROw/exec";
+  var STORAGE_KEY = "pdrfmStudioMarquee";
+  var REFRESH_MS = 20 * 60 * 1000;
+
+  var bar = document.getElementById("marqueeBar");
+  var track = document.getElementById("marqueeTrack");
+  var lastKey = null;
+
+  function loadCache() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function saveCache(items) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch (e) {}
+  }
+  function appendParsedText(container, text) {
+    var re = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+    var lastIndex = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > lastIndex) container.appendChild(document.createTextNode(text.slice(lastIndex, m.index)));
+      var a = document.createElement("a");
+      a.href = m[2];
+      a.textContent = m[1];
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.style.color = "inherit";
+      a.style.textDecoration = "underline";
+      container.appendChild(a);
+      lastIndex = re.lastIndex;
+    }
+    if (lastIndex < text.length) container.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+  function buildTrackContent(items) {
+    var frag = document.createDocumentFragment();
+    function appendPass() {
+      items.forEach(function (item, idx) {
+        if (idx > 0) frag.appendChild(document.createTextNode("　★　"));
+        appendParsedText(frag, item);
+      });
+    }
+    appendPass();
+    frag.appendChild(document.createTextNode("　★　"));
+    appendPass();
+    return frag;
+  }
+  function render(items) {
+    if (!items || !items.length) return;
+    var key = JSON.stringify(items);
+    if (key === lastKey) return;
+    lastKey = key;
+    track.innerHTML = "";
+    track.appendChild(buildTrackContent(items));
+    bar.classList.add("show");
+    document.body.classList.add("has-marquee");
+    var width = track.scrollWidth / 2;
+    track.style.animationDuration = Math.max(width / 80, 10) + "s";
+  }
+  function fetchMarquee() {
+    fetch(MARQUEE_CHECK_URL, { method: "POST", body: JSON.stringify({ serial: "" }) })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && Array.isArray(data.marquee) && data.marquee.length) {
+          saveCache(data.marquee);
+          render(data.marquee);
+        }
+      })
+      .catch(function () {});
+  }
+
+  render(loadCache());
+  fetchMarquee();
+  setInterval(fetchMarquee, REFRESH_MS);
+})();
+</script>
+
+<script>
+/* ================= PWA 加入主畫面（獨立運作，跟上方主程式邏輯無關） ================= */
+(function () {
+  "use strict";
+  var deferredPrompt = null;
+  var btn = document.getElementById("installBtn");
+  var ua = navigator.userAgent || "";
+  var isIOSDevice = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var isMacDesktop = /Macintosh/.test(ua) && !isIOSDevice;
+  var isSafariEngine = /^((?!chrome|crios|fxios|edgios|android).)*safari/i.test(ua);
+  var isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+
+  function fallbackMessage() {
+    if (isIOSDevice) return "請點畫面上的「分享」圖示，選「加入主畫面」";
+    if (isMacDesktop && isSafariEngine) return "請用選單列「檔案」→「加入 Dock」（Safari 17 以上）";
+    return "目前瀏覽器不支援安裝，或已安裝過";
+  }
+
+  function notify(msg) {
+    var t = document.getElementById("toast");
+    if (!t) { window.alert(msg); return; }
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(notify._timer);
+    notify._timer = setTimeout(function () { t.classList.remove("show"); }, 2400);
+  }
+
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferredPrompt = e; });
+  window.addEventListener("appinstalled", function () { deferredPrompt = null; });
+
+  if (btn) {
+    if (isStandalone) { btn.style.display = "none"; }
+    else {
+      btn.addEventListener("click", function () {
+        if (!deferredPrompt) { notify(fallbackMessage()); return; }
+        try { deferredPrompt.prompt(); deferredPrompt.userChoice.then(function () { deferredPrompt = null; }); }
+        catch (e) { notify(fallbackMessage()); }
+      });
+    }
+  }
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("service-worker.js").catch(function () {}); });
+  }
+})();
+</script>
+</body>
+</html>
