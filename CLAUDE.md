@@ -39,6 +39,13 @@
 - **同日再加上「客戶清單與基準日」「客戶明細」兩張卡片各自獨立收合**（使用者要求，這兩張卡片內容長，筆數多時把其他區塊擠到很下面）：`#customerListCard`／`#detailCard` 各自用 `.collapsed` class 切換，收合時隱藏 `#customerListBody`／`#detailBody`（說明文字/工具列/篩選列/表格全部收在這個容器內）、改顯示各自的 `#customerListCollapsedHint`／`#detailCollapsedHint` 摘要列；`pdrfmCustomerListCollapsed`／`pdrfmDetailCollapsed` 兩個獨立 localStorage key 各自記住開合狀態。`loadCustomerListCollapse()`／`loadDetailCollapse()` 需在 `loadRfmState()` 之後呼叫才能拿到正確的客戶筆數摘要文字；`updateDetailCollapsedHint()` 掛在 `renderRfmDetailTable()` 尾端，每次篩選/重算都會更新摘要裡的總筆數（用 `totalCount` 參數而非篩選後的 `rows.length`，收合摘要要顯示全體筆數不是篩選後的子集筆數）。
 - **同日再加上 F/M 範圍篩選＋欄位顯示/隱藏**（使用者反映客戶明細欄位太多太寬）：`getFilteredDetailRows()` 擴充 `detailFreqMin/Max`／`detailMonMin/Max` 四個 number input 做範圍篩選（留空即不限，用 `parseFloat` + `isNaN` 判斷，不是用 truthy 判斷 0 這種合法邊界值）。欄位顯示/隱藏用 `DETAIL_COLUMNS` 陣列（`{key,label,render(r)}`，客戶代號／客群固定不在此陣列內、永遠顯示）＋ `detailColVisible` 物件（`pdrfmDetailColumns` localStorage 記住設定）＋原生 `<details><summary>` 摺疊面板（免寫開闔 JS），`renderRfmDetailTable()` 依 `detailColVisible` 動態組表頭與每列儲存格，不是寫死 9 個固定欄位。
 
+## 電子郵件選填欄位＋客群定義說明（2026-10-17）
+
+- 欄位對應視窗兩種模式都加了 `mapSelEmail`／`mapSelTxnEmail`；`OPTIONAL_MAP_FIELDS` 標記選填欄位（`currentModeIsComplete()` 跳過檢查、空白選項文字為「不匯入（選填）」）。`FIELD_HEURISTICS.email` **刻意放在 id 前面**——「會員Email」同時含 id 關鍵字「會員」，若 id 先比對會被誤認成客戶代號。逐筆交易模式取該客戶第一筆非空信箱。
+- 電子郵件只用於顯示／搜尋／CSV 下載，**不送進 AI 診斷 prompt**（prompt 本來就只送客群彙總數字，維持不送個資）。範例信箱用保留網域 `example.com`。
+- 客戶明細的電子郵件是 `DETAIL_COLUMNS` 第一個可勾選欄位，沿用既有「⚙ 顯示欄位」機制。
+- 客群分布卡片內 `<details class="seg-guide">`（預設收合）由 `buildSegmentGuide()` 依 `SEGMENTS` 的 `desc`／`action` 產生；R/F/M 高低徽章從 key 字元推得。注意客群名稱沿用既有命名（例如 HLL「重要挽留」實際描述是新客/試購客），未改名。
+
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）
 
 - 頂部跑馬燈：獨立 `<script>` 區塊，串工作區共用的 Google Apps Script 公告端點，與主程式邏輯無關（改動主程式不會影響它，反之亦然）。
