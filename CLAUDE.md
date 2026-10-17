@@ -52,6 +52,12 @@
 - **踩坑**：`零售業銷售_訂單明細.xlsx` 的「訂單編號」每列都唯一（5626 列＝5626 號，實為明細序號），拿它算訂單數等於列數。`columnIsUniquePerRow()` 偵測到這種欄位時不自動預選，手動選了 `#mapFreqRule` 顯示警示。驗證基準：AC1700118 有 31 列、12 個不重複日期 → F 應為 12。
 - 金額別名補上「小計／銷售金額／銷售額／實付金額／付款金額／營業額」（原本「小計」猜不到）。
 
+## 清除資料按鈕（2026-10-17）
+
+- `#clearCustomersBtn`：清空 `rfmState.customers`＋所有搜尋/篩選欄位。**刻意不用原生 `confirm()`**（會阻塞頁面、凍結 Playwright），改為按一次變紅「再按一次確認清除（N 筆）」、3 秒內再按才執行（`clearConfirmTimer`）。
+- `loadRfmState()` 條件從 `raw.customers.length` 改為 `Array.isArray(raw.customers)`——否則清空後重新整理會被當成「沒有存檔」而自動套回第一組範例。首次使用（localStorage 完全沒有這個 key）仍會載入範例。
+- 客戶清單空白時顯示 `.empty-row` 提示列；`applyCustomerSearchFilter()` 改只選 `tr[data-idx]`，避免把提示列算進筆數。
+
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）
 
 - 頂部跑馬燈：獨立 `<script>` 區塊，串工作區共用的 Google Apps Script 公告端點，與主程式邏輯無關（改動主程式不會影響它，反之亦然）。

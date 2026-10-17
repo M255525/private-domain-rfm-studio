@@ -155,6 +155,9 @@ table{width:100%;border-collapse:collapse;font-size:13px;}
 .btn:hover{filter:brightness(1.1);}
 .btn.secondary{background:var(--panel-raised);color:var(--text);border:1px solid var(--line);}
 .btn.secondary:hover{border-color:var(--accent);}
+.btn.btn-danger{color:var(--bad);}
+.btn.btn-danger:hover,.btn.btn-danger.confirming{border-color:var(--bad);}
+.btn.btn-danger.confirming{background:var(--bad);color:#fff;}
 .field-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;}
 .budget-calc-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:6px;}
 .budget-calc-row .field{flex:1 1 220px;min-width:180px;}
@@ -436,6 +439,7 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
           <button type="button" class="btn secondary" id="uploadCsvBtn">📤 上傳 CSV／Excel</button>
           <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display:none;">
           <button type="button" class="btn secondary" id="downloadCsvBtn">📥 下載目前清單（CSV）</button>
+          <button type="button" class="btn secondary btn-danger" id="clearCustomersBtn" title="清空目前所有客戶資料與篩選條件">🗑 清除資料</button>
         </div>
         <div class="filter-row">
           <input type="text" id="customerSearchInput" placeholder="🔍 搜尋客戶代號／電子郵件…">
@@ -1143,7 +1147,7 @@ function loadRfmState(){
   var loaded = false;
   try{
     var raw = JSON.parse(localStorage.getItem(RFM_STORAGE_KEY) || "null");
-    if(raw && raw.customers && raw.customers.length){ rfmState = raw; loaded = true; }
+    if(raw && Array.isArray(raw.customers)){ rfmState = raw; loaded = true; }
   }catch(e){}
   if(!loaded){ applyRfmPreset(RFM_PRESETS[0], true); return; }
   syncRfmExampleUI();
@@ -1195,6 +1199,9 @@ function renderCustomerTable(){
       '<td><button type="button" class="row-del-btn" data-action="del">✕</button></td>';
     tbody.appendChild(tr);
   });
+  if(!rfmState.customers.length){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6" style="color:var(--text-faint);padding:14px 6px;">目前沒有客戶資料，可以按「上傳 CSV／Excel」、「新增客戶」或點選上方範例重新開始。</td></tr>';
+  }
   applyCustomerSearchFilter();
   updateCustomerListCollapsedHint();
 }
@@ -1222,7 +1229,7 @@ function loadCustomerListCollapse(){
 function applyCustomerSearchFilter(){
   var input = $("customerSearchInput"); if(!input) return;
   var q = input.value.trim().toLowerCase();
-  var rows = $("customerTableBody").querySelectorAll("tr");
+  var rows = $("customerTableBody").querySelectorAll("tr[data-idx]");
   var visible = 0;
   rows.forEach(function(tr){
     var idx = parseInt(tr.dataset.idx, 10);
@@ -1260,6 +1267,31 @@ $("addCustomerBtn") && $("addCustomerBtn").addEventListener("click", function(){
   persistRfmState();
   renderCustomerTable();
   recalcRfm();
+});
+// 清除資料：不用瀏覽器原生 confirm()（會阻塞頁面），改成按一次變紅色「再按一次確認」、3 秒內再按才真正清除
+var clearConfirmTimer = null;
+function resetClearBtn(){
+  var btn = $("clearCustomersBtn"); if(!btn) return;
+  clearTimeout(clearConfirmTimer); clearConfirmTimer = null;
+  btn.classList.remove("confirming");
+  btn.textContent = "🗑 清除資料";
+}
+$("clearCustomersBtn") && $("clearCustomersBtn").addEventListener("click", function(){
+  var btn = $("clearCustomersBtn");
+  if(!rfmState.customers.length){ showToast("目前已經沒有客戶資料"); return; }
+  if(!btn.classList.contains("confirming")){
+    btn.classList.add("confirming");
+    btn.textContent = "⚠ 再按一次確認清除（" + rfmState.customers.length + " 筆）";
+    clearConfirmTimer = setTimeout(resetClearBtn, 3000);
+    return;
+  }
+  var n = rfmState.customers.length;
+  resetClearBtn();
+  rfmState.customers = []; rfmState.presetId = null;
+  ["customerSearchInput","detailSearchInput","detailFreqMin","detailFreqMax","detailMonMin","detailMonMax"].forEach(function(id){ if($(id)) $(id).value = ""; });
+  if($("detailSegmentFilter")) $("detailSegmentFilter").value = "";
+  persistRfmState(); syncRfmExampleUI(); renderCustomerTable(); recalcRfm();
+  showToast("已清除 " + n + " 筆客戶資料");
 });
 $("rfmBaseDate") && $("rfmBaseDate").addEventListener("change", function(){
   rfmState.baseDate = $("rfmBaseDate").value || isoDate(new Date());
@@ -1349,7 +1381,7 @@ function renderRfmDetailTable(rows, totalCount){
   var cols = DETAIL_COLUMNS.filter(function(c){ return detailColVisible[c.key] !== false; });
   var html = '<thead><tr><th>客戶代號</th>' + cols.map(function(c){ return "<th>"+c.label+"</th>"; }).join("") + '<th>客群</th></tr></thead><tbody>';
   if(!rows.length){
-    html += '<tr><td colspan="'+(cols.length+2)+'" style="color:var(--text-faint);text-align:left;">沒有符合篩選條件的客戶</td></tr>';
+    html += '<tr><td colspan="'+(cols.length+2)+'" style="color:var(--text-faint);text-align:left;">'+(totalCount ? "沒有符合篩選條件的客戶" : "目前沒有客戶資料")+'</td></tr>';
   } else {
     rows.forEach(function(r){
       var cells = cols.map(function(c){ return "<td>"+c.render(r)+"</td>"; }).join("");
