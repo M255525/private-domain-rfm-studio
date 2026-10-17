@@ -46,6 +46,10 @@
     border-radius:8px;padding:14px 16px;font-size:13.5px;color:var(--text-dim);
   }
   .warn strong{color:var(--red);}
+  .calc-table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px;}
+  .calc-table th,.calc-table td{border-bottom:1px solid var(--line-soft);padding:6px 8px;text-align:center;color:var(--text-dim);}
+  .calc-table th{color:#fff;background:var(--bg-alt);}
+  .formula{background:var(--bg-alt);border-left:3px solid var(--accent2);border-radius:6px;padding:10px 14px;margin:10px 0;font-size:14px;color:var(--text);line-height:1.9;}
   code{background:var(--bg-alt);padding:1px 6px;border-radius:4px;font-size:13px;}
   footer{border-top:1px solid var(--line-soft);background:var(--bg-alt);padding:24px;text-align:center;font-size:12.5px;color:var(--text-faint);}
 </style>
@@ -91,10 +95,58 @@
 
   <div class="card">
     <h2>RFM顧客分群分析 — 評分與分群說明</h2>
-    <p>R（Recency，最近購買）／F（Frequency，購買頻率）／M（Monetary，消費金額）三個維度，各自依全體客戶的分布換算成 1-10 分（十分位評分法，同值同分，觀念上等同常見的 PERCENTRANK 百分等級評分）：Recency 是天數越少（越近期）分數越高，Frequency／Monetary 則是數值越大分數越高。</p>
+    <p>R（Recency，最近購買）／F（Frequency，購買頻率）／M（Monetary，消費金額）三個維度，各自依全體客戶的分布換算成 1-10 分。</p>
+
+    <h3>步驟一：三個原始數值</h3>
+    <table class="calc-table">
+      <tr><th>指標</th><th>怎麼來</th><th>分數方向</th></tr>
+      <tr><td>R（Recency）</td><td>基準日 − 最近購買日期（天）</td><td>天數<strong>越少</strong>分數越高</td></tr>
+      <tr><td>F（Frequency）</td><td>購買次數</td><td>越多分數越高</td></tr>
+      <tr><td>M（Monetary）</td><td>累計消費金額</td><td>越多分數越高</td></tr>
+    </table>
+
+    <h3>步驟二：依「在全體客戶中的相對位置」換算 1～10 分</h3>
+    <p>分數<strong>不是固定門檻</strong>（不是「買 5 次就 8 分」這種規則），而是看這位客戶在目前所有客戶中排在什麼位置。三個指標各自這樣算：</p>
+    <div class="formula">
+      ① 名次 ＝ 比他小的人數 ＋（跟他同值的人數 ＋ 1）÷ 2<br>
+      ② 百分位 ＝（名次 − 1）÷（客戶總數 − 1）　→ 介於 0～1<br>
+      　 R 要再做一次「1 − 百分位」（因為天數少才是好事）<br>
+      ③ 分數 ＝ 1 ＋ 9 × 百分位，四捨五入，最低 1 分、最高 10 分
+    </div>
+    <p><strong>範例</strong>：5 位客戶的購買次數分別是 1、1、3、5、8 次——</p>
+    <table class="calc-table">
+      <tr><th>購買次數</th><th>比他小的人數</th><th>同值人數</th><th>名次</th><th>百分位</th><th>F分</th></tr>
+      <tr><td>1</td><td>0</td><td>2</td><td>1.5</td><td>0.125</td><td>2</td></tr>
+      <tr><td>3</td><td>2</td><td>1</td><td>3</td><td>0.5</td><td>6</td></tr>
+      <tr><td>5</td><td>3</td><td>1</td><td>4</td><td>0.75</td><td>8</td></tr>
+      <tr><td>8</td><td>4</td><td>1</td><td>5</td><td>1.0</td><td>10</td></tr>
+    </table>
+    <p>兩位都買 1 次的客戶同值同分，取中間名次 1.5，所以都是 2 分。</p>
+
+    <div class="tip"><strong>容易誤解的地方：</strong>
+      <ul>
+        <li><strong>分數是相對的</strong>：同一位客戶放在不同的客戶名單裡，分數可能不同；新增或刪除客戶後，全部客戶都會重新排名。</li>
+        <li><strong>大量同值會集中在同一個分數</strong>：例如有將近一半的客戶都只買過 1 次，他們會一起拿到偏低的同一個 F 分（實測一份 2940 位客戶、其中 1394 位只買 1 次的資料，這群人 F 分全是 3 分），這是評分方式本身的結果，不是計算錯誤。</li>
+        <li><strong>畫面上的篩選不影響分數</strong>：客戶明細的搜尋／客群／F、M 範圍篩選只決定「顯示哪些人」，分數一律用全部客戶計算。</li>
+        <li><strong>基準日只影響顯示的天數，不影響 R 分</strong>：改基準日時所有客戶的天數會同時增減相同的數字，先後順序不變，因此 R 分與客群分類都不會改變。</li>
+        <li><strong>資料不完整不計入</strong>：最近購買日期空白或無法辨識、購買次數或金額空白的客戶，不會納入評分與客群分布。</li>
+        <li>只有 1 位客戶時無從比較，三項都直接給 10 分。</li>
+        <li>此做法與 Excel 的 PERCENTRANK 百分等級觀念相近，差別在同值處理：Excel 給同值者最低名次，本工具給中間名次。</li>
+      </ul>
+    </div>
+
+    <h3>步驟三：分群</h3>
+    <p>R／F／M 三個分數各自以 <strong>6 分以上算「高」</strong>、5 分以下算「低」，三個高低組合成下方 8 種客群。</p>
     <h3>客群分類</h3>
     <p>R／F／M 三個分數各自以 6 分為門檻分「高／低」，組合成 8 種客群：重要價值客戶、重要發展客戶、重要保持客戶、重要挽留客戶、一般價值客戶、一般發展客戶、一般保持客戶、流失風險客戶。畫面上「客群分布」卡片內有一個「📖 8 種客群定義說明」收合區塊（預設收合），展開後可看到每種客群的 R／F／M 高低組合、白話定義與建議做法。</p>
     <div class="tip"><strong>請注意：</strong>這套 8 客群分類是業界常見的 RFM 通用分群框架，並非原始課程試算表既有的邏輯（原始試算表只算到 R／F／M 三個 1-10 分數為止，沒有分群功能），是本工具為了讓分析結果更好理解而額外設計補上的，僅供參考，不是唯一標準做法。</div>
+    <h3>客群分布圖怎麼看</h3>
+    <ul>
+      <li><strong>長條圖</strong>：每種客群的人數，8 個長條加總＝客戶總數。</li>
+      <li><strong>散佈圖</strong>：每個點是一位客戶，橫軸是累計消費金額（M）、縱軸是購買次數（F），顏色代表客群；滑鼠移到點上可看客戶代號與數值。購買次數是整數，很多客戶會疊在同一個位置，所以點設成半透明——<strong>顏色越深代表疊在那裡的人越多</strong>。</li>
+      <li><strong>「金額軸使用對數刻度」</strong>：少數高消費客戶會把大部分客戶擠到左下角時，勾選這個選項，橫軸改成 100、1,000、10,000 這種倍數刻度，較容易看清楚分布；只改變顯示方式，不影響分數與分群。</li>
+      <li>散佈圖只畫 F 與 M 兩個維度，沒有畫 R，所以同一區塊裡出現不同顏色的點是正常的（差在最近購買日期）。</li>
+    </ul>
     <h3>收合區塊</h3>
     <p>「客戶清單與基準日」「客戶明細」兩張卡片右上角都有「▲ 收合」按鈕，收合後只留標題列與一行摘要（目前共幾筆客戶），可以快速跳到你想看的區塊、不用一直往下捲；兩張卡片的收合狀態各自獨立記住供下次使用，隨時可按「▼ 展開」叫回來。</p>
     <h3>筆數較多時：搜尋、縮放、篩選、隱藏欄位</h3>

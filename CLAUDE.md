@@ -63,6 +63,11 @@
 - `#detailExportCsvBtn`／`#detailExportXlsxBtn`：`buildDetailExportAoa()` 用 `getFilteredDetailRows(lastRfmRows)`＋`detailColVisible`，**跟畫面一致**（篩選後的列、勾選的欄位）。`DETAIL_COLUMNS` 每欄加了 `value(r)`（原始數值，非 `render()` 的 NT$ 格式字串）與 `exportLabel`（檔案表頭用較完整的名稱，如「購買次數(F)」）。Excel 用既有 SheetJS（`loadCsvLibs()` 等待載入）`XLSX.writeFile`，工作表名「客戶明細」；檔名 `RFM客戶明細_基準日YYYY-MM-DD`。
 - 與客戶清單的「📥 下載目前清單（CSV）」不同：那個是原始輸入資料（可再匯入），這個是計算後含分數/客群的結果。
 
+## 客群分布圖顯示修正＋手冊評分說明（2026-10-17）
+
+- 長條圖 x 軸、散佈圖 y 軸加 `ticks:{precision:0}`（人數／次數不會有小數刻度）。散佈圖點改半透明（`color+"73"`）＋實線邊框，重疊處變深代表密度；tooltip 顯示客戶代號／客群／F／M。`#scatterLogToggle`（`pdrfmScatterLog`）切換金額軸 `logarithmic`，log 軸畫不了 0，金額 0 以 1 代替（tooltip 仍顯示原值 `p.m`）。
+- manual.html「評分與分群說明」已寫入完整公式＋5 人範例表＋容易誤解清單（使用者要求，避免誤解）。**基準日不影響 R 分與分群**（所有人天數同時位移，排名不變，已實測改基準日客群人數完全相同），文案不要寫成「會影響」。
+
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）
 
 - 頂部跑馬燈：獨立 `<script>` 區塊，串工作區共用的 Google Apps Script 公告端點，與主程式邏輯無關（改動主程式不會影響它，反之亦然）。

@@ -117,6 +117,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;}
 
 /* ---------- Chart box ---------- */
 .chart-box{position:relative;height:260px;margin:10px 0;}
+.scatter-log-opt{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-faint);cursor:pointer;margin-top:-4px;}
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;}
 
 /* ---------- Heatmap ---------- */
@@ -473,7 +474,10 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
       <div class="kpi-row" id="segmentKpiRow"></div>
       <div class="chart-grid">
         <div><div class="chart-box"><canvas id="segmentChart"></canvas></div></div>
-        <div><div class="chart-box"><canvas id="scatterChart"></canvas></div></div>
+        <div>
+          <div class="chart-box"><canvas id="scatterChart"></canvas></div>
+          <label class="scatter-log-opt"><input type="checkbox" id="scatterLogToggle"> 金額軸使用對數刻度（少數高消費客戶把其他人擠在左下角時較易閱讀）</label>
+        </div>
       </div>
     </div>
 
@@ -1323,15 +1327,30 @@ function renderSegmentChart(rows){
   renderChart("segmentChart", {
     type:"bar",
     data:{ labels:SEGMENTS.map(function(s){return s.label;}), datasets:[{label:"客戶數", data:counts, backgroundColor:SEGMENTS.map(function(s){return s.color;})}] },
-    options:{ responsive:true, maintainAspectRatio:false, indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{grid:{color:CHART_GRID_COLOR}}, y:{grid:{display:false}}} }
+    options:{ responsive:true, maintainAspectRatio:false, indexAxis:"y", plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true, ticks:{precision:0}, grid:{color:CHART_GRID_COLOR}}, y:{grid:{display:false}}} }
+  });
+}
+// 散佈圖：F 是整數，大量客戶會疊在同一點，點設半透明讓重疊處顏色變深以呈現密度；
+// 對數刻度選項給少數極端高消費客戶把其他人擠在左下角的情況用（log 軸無法畫 0，金額 0 以 1 代替）
+var SCATTER_LOG_KEY = "pdrfmScatterLog";
+var scatterLog = false;
+try{ scatterLog = localStorage.getItem(SCATTER_LOG_KEY) === "1"; }catch(e){}
+if($("scatterLogToggle")){
+  $("scatterLogToggle").checked = scatterLog;
+  $("scatterLogToggle").addEventListener("change", function(){
+    scatterLog = $("scatterLogToggle").checked;
+    try{ localStorage.setItem(SCATTER_LOG_KEY, scatterLog ? "1" : "0"); }catch(e){}
+    renderScatterChart(lastRfmRows);
   });
 }
 function renderScatterChart(rows){
   var datasets = SEGMENTS.map(function(s){
     return {
       label:s.label,
-      data: rows.filter(function(r){ return r.segment.key===s.key; }).map(function(r){ return {x:r.monetary, y:r.frequency}; }),
-      backgroundColor:s.color
+      data: rows.filter(function(r){ return r.segment.key===s.key; }).map(function(r){
+        return {x: scatterLog ? Math.max(r.monetary, 1) : r.monetary, y:r.frequency, id:r.id, m:r.monetary};
+      }),
+      backgroundColor:s.color + "73", borderColor:s.color, borderWidth:1, pointRadius:4, pointHoverRadius:6
     };
   });
   renderChart("scatterChart", {
@@ -1339,8 +1358,15 @@ function renderScatterChart(rows){
     data:{ datasets:datasets },
     options:{
       responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:"bottom", labels:{boxWidth:10, font:{size:10}}}},
-      scales:{ x:{title:{display:true,text:"累計消費金額(M)"}, grid:{color:CHART_GRID_COLOR}}, y:{title:{display:true,text:"購買次數(F)"}, grid:{color:CHART_GRID_COLOR}} }
+      plugins:{
+        legend:{position:"bottom", labels:{boxWidth:10, font:{size:10}}},
+        tooltip:{callbacks:{label:function(ctx){ var p = ctx.raw; return p.id + "｜" + ctx.dataset.label + "｜F " + fmtInt(p.y) + " 次｜M " + fmtMoney(p.m); }}}
+      },
+      scales:{
+        x:{type: scatterLog ? "logarithmic" : "linear", title:{display:true,text:"累計消費金額(M)" + (scatterLog ? "（對數刻度）" : "")}, grid:{color:CHART_GRID_COLOR},
+           ticks: scatterLog ? {callback:function(v){ var l = Math.log10(v); return Math.abs(l - Math.round(l)) < 1e-9 ? fmtInt(v) : ""; }} : {}},
+        y:{beginAtZero:true, ticks:{precision:0}, title:{display:true,text:"購買次數(F)"}, grid:{color:CHART_GRID_COLOR}}
+      }
     }
   });
 }
