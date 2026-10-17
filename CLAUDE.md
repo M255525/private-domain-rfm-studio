@@ -58,6 +58,11 @@
 - `loadRfmState()` 條件從 `raw.customers.length` 改為 `Array.isArray(raw.customers)`——否則清空後重新整理會被當成「沒有存檔」而自動套回第一組範例。首次使用（localStorage 完全沒有這個 key）仍會載入範例。
 - 客戶清單空白時顯示 `.empty-row` 提示列；`applyCustomerSearchFilter()` 改只選 `tr[data-idx]`，避免把提示列算進筆數。
 
+## 客戶明細匯出 CSV／Excel（2026-10-17）
+
+- `#detailExportCsvBtn`／`#detailExportXlsxBtn`：`buildDetailExportAoa()` 用 `getFilteredDetailRows(lastRfmRows)`＋`detailColVisible`，**跟畫面一致**（篩選後的列、勾選的欄位）。`DETAIL_COLUMNS` 每欄加了 `value(r)`（原始數值，非 `render()` 的 NT$ 格式字串）與 `exportLabel`（檔案表頭用較完整的名稱，如「購買次數(F)」）。Excel 用既有 SheetJS（`loadCsvLibs()` 等待載入）`XLSX.writeFile`，工作表名「客戶明細」；檔名 `RFM客戶明細_基準日YYYY-MM-DD`。
+- 與客戶清單的「📥 下載目前清單（CSV）」不同：那個是原始輸入資料（可再匯入），這個是計算後含分數/客群的結果。
+
 ## 共用元件（跟隨工作區既有慣例，非本專案獨創）
 
 - 頂部跑馬燈：獨立 `<script>` 區塊，串工作區共用的 Google Apps Script 公告端點，與主程式邏輯無關（改動主程式不會影響它，反之亦然）。

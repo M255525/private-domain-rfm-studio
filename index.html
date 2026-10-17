@@ -505,6 +505,11 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
           </details>
           <span class="filter-count" id="detailFilterCount"></span>
         </div>
+        <div class="toolbar-row">
+          <button type="button" class="btn secondary" id="detailExportCsvBtn">📥 下載明細（CSV）</button>
+          <button type="button" class="btn secondary" id="detailExportXlsxBtn">📥 下載明細（Excel）</button>
+          <span class="hint" style="margin:0;align-self:center;">依目前的搜尋／篩選結果與勾選的顯示欄位匯出</span>
+        </div>
         <div class="table-scroll rfm-zoomable"><table class="result-table" id="rfmDetailTable"></table></div>
       </div>
     </div>
@@ -1341,14 +1346,14 @@ function renderScatterChart(rows){
 }
 // 客戶明細表格可選欄位（客戶代號／客群固定顯示，其餘可透過「⚙ 顯示欄位」勾選隱藏，避免欄位太多太寬）
 var DETAIL_COLUMNS = [
-  { key:"email", label:"電子郵件", render:function(r){ return r.email ? escapeHtml(r.email) : '<span style="color:var(--text-faint);">-</span>'; } },
-  { key:"lastPurchaseDate", label:"最近購買日期", render:function(r){ return escapeHtml(r.lastPurchaseDate); } },
-  { key:"recencyDays", label:"Recency(天)", render:function(r){ return fmtInt(r.recencyDays); } },
-  { key:"frequency", label:"F", render:function(r){ return fmtInt(r.frequency); } },
-  { key:"monetary", label:"M", render:function(r){ return fmtMoney(r.monetary); } },
-  { key:"rScore", label:"R分", render:function(r){ return r.rScore; } },
-  { key:"fScore", label:"F分", render:function(r){ return r.fScore; } },
-  { key:"mScore", label:"M分", render:function(r){ return r.mScore; } }
+  { key:"email", label:"電子郵件", exportLabel:"電子郵件", value:function(r){ return r.email||""; }, render:function(r){ return r.email ? escapeHtml(r.email) : '<span style="color:var(--text-faint);">-</span>'; } },
+  { key:"lastPurchaseDate", label:"最近購買日期", exportLabel:"最近購買日期", value:function(r){ return r.lastPurchaseDate; }, render:function(r){ return escapeHtml(r.lastPurchaseDate); } },
+  { key:"recencyDays", label:"Recency(天)", exportLabel:"距今天數(R)", value:function(r){ return r.recencyDays; }, render:function(r){ return fmtInt(r.recencyDays); } },
+  { key:"frequency", label:"F", exportLabel:"購買次數(F)", value:function(r){ return r.frequency; }, render:function(r){ return fmtInt(r.frequency); } },
+  { key:"monetary", label:"M", exportLabel:"累計消費金額(M)", value:function(r){ return r.monetary; }, render:function(r){ return fmtMoney(r.monetary); } },
+  { key:"rScore", label:"R分", exportLabel:"R分", value:function(r){ return r.rScore; }, render:function(r){ return r.rScore; } },
+  { key:"fScore", label:"F分", exportLabel:"F分", value:function(r){ return r.fScore; }, render:function(r){ return r.fScore; } },
+  { key:"mScore", label:"M分", exportLabel:"M分", value:function(r){ return r.mScore; }, render:function(r){ return r.mScore; } }
 ];
 var DETAIL_COL_KEY = "pdrfmDetailColumns";
 var detailColVisible = {};
@@ -1440,6 +1445,49 @@ function refreshDetailTableOnly(){
   $(id) && $(id).addEventListener("input", refreshDetailTableOnly);
 });
 $("detailSegmentFilter") && $("detailSegmentFilter").addEventListener("change", refreshDetailTableOnly);
+// 匯出客戶明細：跟畫面上看到的一致（篩選後的列＋勾選顯示的欄位），數值輸出原始數字而非 NT$ 格式字串，方便在 Excel 再運算
+function buildDetailExportAoa(){
+  var rows = getFilteredDetailRows(lastRfmRows);
+  var cols = DETAIL_COLUMNS.filter(function(c){ return detailColVisible[c.key] !== false; });
+  var aoa = [["客戶代號"].concat(cols.map(function(c){ return c.exportLabel; }), ["客群"])];
+  rows.forEach(function(r){
+    aoa.push([r.id].concat(cols.map(function(c){ return c.value(r); }), [r.segment.label]));
+  });
+  return aoa;
+}
+function detailExportFileBase(){ return "RFM客戶明細_基準日" + rfmState.baseDate; }
+function csvCell(v){
+  var str = v==null ? "" : String(v);
+  return /[",\r\n]/.test(str) ? '"' + str.replace(/"/g,'""') + '"' : str;
+}
+function triggerDownload(blob, filename){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+$("detailExportCsvBtn") && $("detailExportCsvBtn").addEventListener("click", function(){
+  var aoa = buildDetailExportAoa();
+  if(aoa.length <= 1){ showToast("目前沒有可下載的客戶明細"); return; }
+  var text = aoa.map(function(row){ return row.map(csvCell).join(","); }).join("\r\n");
+  triggerDownload(new Blob(["\ufeff" + text], {type:"text/csv;charset=utf-8;"}), detailExportFileBase() + ".csv");
+  showToast("已下載 " + (aoa.length-1) + " 筆客戶明細（CSV）");
+});
+$("detailExportXlsxBtn") && $("detailExportXlsxBtn").addEventListener("click", function(){
+  var aoa = buildDetailExportAoa();
+  if(aoa.length <= 1){ showToast("目前沒有可下載的客戶明細"); return; }
+  loadCsvLibs().then(function(){
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = aoa[0].map(function(h){ return { wch: Math.max(10, String(h).length*2 + 2) }; });
+    var emailIdx = aoa[0].indexOf("電子郵件");
+    if(emailIdx !== -1) ws["!cols"][emailIdx] = { wch: 28 };
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "客戶明細");
+    XLSX.writeFile(wb, detailExportFileBase() + ".xlsx");
+    showToast("已下載 " + (aoa.length-1) + " 筆客戶明細（Excel）");
+  });
+});
 function buildDetailSegmentFilter(){
   var sel = $("detailSegmentFilter"); if(!sel) return;
   sel.innerHTML = '<option value="">全部客群</option>';
