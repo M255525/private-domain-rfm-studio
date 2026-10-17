@@ -215,6 +215,7 @@ textarea.ai-extra{
 #mapFieldsTransaction.hidden, #mapFieldsCustomer.hidden{display:none;}
 .map-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .map-row label{width:130px;flex:none;font-size:13px;color:var(--text-dim);}
+.map-freq-rule{flex:1;font-size:12.5px;color:var(--accent2);background:var(--bg-alt);border:1px dashed var(--line);border-radius:6px;padding:7px 9px;line-height:1.5;}
 .map-optional{color:var(--text-faint);font-size:12px;}
 .map-row select{flex:1;background:var(--bg-alt);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 9px;font-size:13px;}
 .map-preview{margin-top:16px;}
@@ -541,7 +542,7 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
       <label class="map-mode-opt"><input type="radio" name="importMode" id="modeCustomer" value="customer" checked> 每位客戶一列（檔案裡已經有算好的「購買次數」「累計消費金額」欄位）</label>
       <label class="map-mode-opt"><input type="radio" name="importMode" id="modeTransaction" value="transaction"> 逐筆交易紀錄（每筆訂單一列，同一位客戶會出現在很多列，看不出哪欄是「購買次數」「最近購買日期」時選這個）</label>
     </div>
-    <p class="modal-desc map-mode-hint">選「逐筆交易紀錄」時，只需告訴系統客戶代號、交易日期、交易金額三欄在哪，「購買次數」＝該客戶出現的列數、「最近購買日期」＝該客戶所有交易日期中最新的一筆、「累計消費金額」＝該客戶所有交易金額加總，系統自動幫你算，不需要檔案裡已經有這兩欄。</p>
+    <p class="modal-desc map-mode-hint">選「逐筆交易紀錄」時，只需告訴系統客戶代號、交易日期、交易金額三欄在哪，「購買次數」＝該客戶不重複的訂單數（有指定訂單編號時）或不重複的購買日數（沒指定時，同一天買多件商品只算 1 次）、「最近購買日期」＝該客戶所有交易日期中最新的一筆、「累計消費金額」＝該客戶所有交易金額加總，系統自動幫你算，不需要檔案裡已經有這兩欄。</p>
 
     <div id="mapFieldsCustomer">
       <div class="map-row"><label for="mapSelId">客戶代號</label><select id="mapSelId"></select></div>
@@ -554,7 +555,9 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
       <div class="map-row"><label for="mapSelTxnId">客戶代號</label><select id="mapSelTxnId"></select></div>
       <div class="map-row"><label for="mapSelTxnDate">交易日期</label><select id="mapSelTxnDate"></select></div>
       <div class="map-row"><label for="mapSelTxnAmount">交易金額</label><select id="mapSelTxnAmount"></select></div>
+      <div class="map-row"><label for="mapSelTxnOrder">訂單編號<span class="map-optional">（選填）</span></label><select id="mapSelTxnOrder"></select></div>
       <div class="map-row"><label for="mapSelTxnEmail">電子郵件<span class="map-optional">（選填）</span></label><select id="mapSelTxnEmail"></select></div>
+      <div class="map-row"><label>購買次數(F)</label><div class="map-freq-rule" id="mapFreqRule"></div></div>
     </div>
 
     <div class="map-preview">
@@ -1432,8 +1435,9 @@ var CSV_FIELD_ALIASES = {
   id: ["客戶代號","客戶編號","顧客代號","客戶id","顧客id","會員編號","會員代號","會員id","customerid","customer id","memberid","member id","customer","id"],
   lastPurchaseDate: ["最近購買日期","最後購買日期","購買日期","最近消費日期","最後消費日期","最近交易日期","訂單日期","lastpurchasedate","last purchase date","purchasedate","orderdate","date"],
   frequency: ["購買次數","訂單次數","消費次數","交易次數","次數","frequency","purchasecount","ordercount","f"],
-  monetary: ["累計消費金額","消費金額","消費總額","總消費金額","總金額","交易金額","訂單金額","金額","monetary","totalamount","total spend","amount","spend","m"],
-  email: ["電子郵件","電子信箱","電郵","信箱","email","e-mail","mail","emailaddress","email address"]
+  monetary: ["累計消費金額","消費金額","消費總額","總消費金額","總金額","交易金額","訂單金額","金額","小計","銷售金額","銷售額","實付金額","付款金額","營業額","monetary","totalamount","total spend","amount","spend","m"],
+  email: ["電子郵件","電子信箱","電郵","信箱","email","e-mail","mail","emailaddress","email address"],
+  orderId: ["訂單編號","訂單號碼","訂單代號","訂單id","單號","交易編號","交易序號","orderid","order id","orderno","order no","ordernumber","order number","invoice","invoiceno"]
 };
 // 表頭精確比對別名清單失敗時的備援：用關鍵字子字串猜測（刻意不含單一字母，避免誤判）
 var FIELD_HEURISTICS = {
@@ -1443,7 +1447,7 @@ var FIELD_HEURISTICS = {
   id: ["客戶","顧客","會員","customer","member","name","姓名"],
   lastPurchaseDate: ["日期","time","時間"],
   frequency: ["次數","頻率","count","frequency"],
-  monetary: ["金額","消費","總額","amount","monetary","spend","total","revenue","營收"]
+  monetary: ["金額","消費","總額","小計","銷售額","amount","monetary","spend","total","revenue","營收","subtotal"]
 };
 function normalizeHeader(h){ return String(h==null?"":h).trim().toLowerCase().replace(/[\s()（）_-]/g,""); }
 function mapHeaders(headers){
@@ -1499,9 +1503,9 @@ function loadCsvLibs(){
 
 /* ---------- 欄位對應確認視窗（自動猜測＋手動調整＋即時預覽；支援「每人一列」或「逐筆交易」兩種來源格式） ---------- */
 var MAP_FIELD_SELECTS_CUSTOMER = { id:"mapSelId", lastPurchaseDate:"mapSelDate", frequency:"mapSelFreq", monetary:"mapSelMonetary", email:"mapSelEmail" };
-var MAP_FIELD_SELECTS_TXN = { id:"mapSelTxnId", lastPurchaseDate:"mapSelTxnDate", monetary:"mapSelTxnAmount", email:"mapSelTxnEmail" };
+var MAP_FIELD_SELECTS_TXN = { id:"mapSelTxnId", lastPurchaseDate:"mapSelTxnDate", monetary:"mapSelTxnAmount", orderId:"mapSelTxnOrder", email:"mapSelTxnEmail" };
 // 選填欄位：沒選也能匯入，下拉選單的空白選項文字也不同
-var OPTIONAL_MAP_FIELDS = { email:true };
+var OPTIONAL_MAP_FIELDS = { email:true, orderId:true };
 var pendingImportAoa = null;
 
 function truncateCellText(v){
@@ -1534,8 +1538,9 @@ function readSelectGroup(selectIds){
   });
   return out;
 }
-// 逐筆交易紀錄彙總：同一客戶代號可能出現在多列，購買次數＝列數、最近購買日期＝所有交易日期取最大值、
-// 累計消費金額＝所有交易金額加總——這樣使用者不需要檔案裡已經有現成的「購買次數」欄位
+// 逐筆交易紀錄彙總：同一客戶代號可能出現在多列，最近購買日期＝所有交易日期取最大值、累計消費金額＝所有交易金額加總。
+// 購買次數不是單純數列數——很多匯出檔是「每個商品一列」，一張訂單買 3 件會變 3 列；有指定訂單編號時算不重複訂單數，
+// 沒指定時算不重複購買日數（同一天的多列視為同一次購買），都沒有才退回列數
 function rowsFromTransactions(aoa, map){
   var groups = {}; var order = [];
   for(var i=1;i<aoa.length;i++){
@@ -1543,7 +1548,7 @@ function rowsFromTransactions(aoa, map){
     var idVal = map.id!=null ? row[map.id] : null;
     if(idVal == null || idVal === "") continue;
     var idStr = String(idVal);
-    if(!groups[idStr]){ groups[idStr] = { dates:[], sum:0, count:0, email:"" }; order.push(idStr); }
+    if(!groups[idStr]){ groups[idStr] = { dates:[], sum:0, count:0, email:"", visits:{} }; order.push(idStr); }
     var g = groups[idStr];
     if(!g.email && map.email!=null && row[map.email]!=null) g.email = String(row[map.email]).trim();
     var dateVal = map.lastPurchaseDate!=null ? row[map.lastPurchaseDate] : null;
@@ -1552,13 +1557,17 @@ function rowsFromTransactions(aoa, map){
     else if(dateVal){ d = parseIsoDate(dateVal); }
     if(d) g.dates.push(d);
     g.count += 1;
+    var orderVal = map.orderId!=null ? row[map.orderId] : null;
+    if(orderVal != null && orderVal !== "") g.visits["o:" + String(orderVal)] = true;
+    else if(map.orderId == null && d) g.visits["d:" + isoDate(d)] = true;
     var amt = map.monetary!=null ? parseFloat(row[map.monetary]) : NaN;
     if(!isNaN(amt)) g.sum += amt;
   }
   return order.map(function(idStr){
     var g = groups[idStr];
     var maxDate = g.dates.length ? new Date(Math.max.apply(null, g.dates.map(function(d){ return d.getTime(); }))) : null;
-    return { id: idStr, email: g.email, lastPurchaseDate: maxDate ? isoDate(maxDate) : "", frequency: g.count, monetary: g.sum };
+    var visitCount = Object.keys(g.visits).length;
+    return { id: idStr, email: g.email, lastPurchaseDate: maxDate ? isoDate(maxDate) : "", frequency: visitCount || g.count, monetary: g.sum };
   });
 }
 function buildRowsForCurrentMode(){
@@ -1574,7 +1583,7 @@ function renderMapPreview(){
   var rows = buildRowsForCurrentMode().slice(0,3);
   var map = currentImportMode() === "transaction" ? readSelectGroup(MAP_FIELD_SELECTS_TXN) : readSelectGroup(MAP_FIELD_SELECTS_CUSTOMER);
   var showEmail = map.email != null;
-  var html = "<thead><tr><th>客戶代號</th>" + (showEmail ? "<th>電子郵件</th>" : "") + "<th>最近購買日期</th><th>購買次數</th><th>累計消費金額</th></tr></thead><tbody>";
+  var html = "<thead><tr><th>客戶代號</th>" + (showEmail ? "<th>電子郵件</th>" : "") + "<th>最近購買日期</th><th>購買次數(F)</th><th>累計消費金額</th></tr></thead><tbody>";
   if(!rows.length){
     html += '<tr><td colspan="'+(showEmail?5:4)+'" style="color:var(--text-faint);white-space:normal;">目前欄位對應解析不出任何資料列，請檢查上方選擇是否正確</td></tr>';
   } else {
@@ -1591,10 +1600,36 @@ function renderMapPreview(){
   html += "</tbody>";
   $("mapPreviewTable").innerHTML = html;
 }
+// 有些匯出檔的「訂單編號」其實是每列都不同的明細序號（一件商品一個號碼），拿來算不重複訂單數會等於列數，
+// 等於沒有合併同一次購買——這種欄位不自動套用，手動選了也提示使用者
+function columnIsUniquePerRow(aoa, idx){
+  if(idx == null || !aoa) return false;
+  var seen = {}, n = 0;
+  for(var i=1;i<aoa.length;i++){
+    var row = aoa[i]; if(!row || !row.length) continue;
+    var v = row[idx]; if(v == null || v === "") continue;
+    var k = String(v);
+    if(seen[k]) return false;
+    seen[k] = true; n++;
+  }
+  return n > 1;
+}
+function updateFreqRule(){
+  var el = $("mapFreqRule"); if(!el) return;
+  var v = $("mapSelTxnOrder").value;
+  if(v === ""){
+    el.textContent = "自動計算＝該客戶不重複的「購買日期」天數（同一天買多件商品只算 1 次）；檔案有真正的訂單編號時可在上方指定，算得更準";
+  } else if(columnIsUniquePerRow(pendingImportAoa, parseInt(v,10))){
+    el.textContent = "⚠ 你選的這欄每一列都不重複，看起來是商品明細序號而不是訂單編號，用它計算會把每件商品都算成 1 次購買；建議改回「不匯入」改以購買日期計算";
+  } else {
+    el.textContent = "自動計算＝該客戶不重複的「訂單編號」數量（同一張訂單買多件商品只算 1 次）";
+  }
+}
 function updateModeVisibility(){
   var isTxn = currentImportMode() === "transaction";
   $("mapFieldsCustomer").classList.toggle("hidden", isTxn);
   $("mapFieldsTransaction").classList.toggle("hidden", !isTxn);
+  updateFreqRule();
   renderMapPreview();
 }
 function openMapModal(aoa){
@@ -1602,7 +1637,8 @@ function openMapModal(aoa){
   var headers = aoa[0] || [];
   var guessMap = mapHeaders(headers);
   populateSelectGroup(MAP_FIELD_SELECTS_CUSTOMER, headers, guessMap);
-  populateSelectGroup(MAP_FIELD_SELECTS_TXN, headers, { id: guessMap.id, lastPurchaseDate: guessMap.lastPurchaseDate, monetary: guessMap.monetary, email: guessMap.email });
+  var orderGuess = columnIsUniquePerRow(aoa, guessMap.orderId) ? null : guessMap.orderId;
+  populateSelectGroup(MAP_FIELD_SELECTS_TXN, headers, { id: guessMap.id, lastPurchaseDate: guessMap.lastPurchaseDate, monetary: guessMap.monetary, orderId: orderGuess, email: guessMap.email });
   // 猜不到「購買次數」欄位、但猜得到客戶代號時，很可能是逐筆交易資料，預設切換到交易彙總模式
   var defaultTxnMode = guessMap.frequency == null && guessMap.id != null;
   $("modeCustomer").checked = !defaultTxnMode;
@@ -1617,6 +1653,7 @@ function closeMapModal(){
 Object.keys(MAP_FIELD_SELECTS_CUSTOMER).map(function(f){ return MAP_FIELD_SELECTS_CUSTOMER[f]; })
   .concat(Object.keys(MAP_FIELD_SELECTS_TXN).map(function(f){ return MAP_FIELD_SELECTS_TXN[f]; }))
   .forEach(function(id){ var sel = $(id); sel && sel.addEventListener("change", renderMapPreview); });
+$("mapSelTxnOrder") && $("mapSelTxnOrder").addEventListener("change", updateFreqRule);
 $("modeCustomer") && $("modeCustomer").addEventListener("change", updateModeVisibility);
 $("modeTransaction") && $("modeTransaction").addEventListener("change", updateModeVisibility);
 $("mapCancelBtn") && $("mapCancelBtn").addEventListener("click", closeMapModal);
