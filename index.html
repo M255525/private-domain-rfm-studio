@@ -607,6 +607,9 @@ footer .footer-link-btn:hover{border-color:var(--accent);color:var(--text);}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 
 <script>
+/* Gemini 已下架／不存在的模型 ID 自動換成現役模型（2026-11 體檢）：新申請的 AI Studio 金鑰呼叫 2.5／2.0 系列會被拒；也順便去掉多打的空白與 models/ 前綴 */
+function geminiModelFix(m){var r={'gemini-2.5-flash': 'gemini-3.6-flash', 'gemini-2.5-flash-lite': 'gemini-3.5-flash-lite', 'gemini-2.5-pro': 'gemini-3.8-flash', 'gemini-2.0-flash': 'gemini-3.6-flash', 'gemini-2.0-flash-001': 'gemini-3.6-flash', 'gemini-2.0-flash-lite': 'gemini-3.1-flash-lite', 'gemini-1.5-flash': 'gemini-3.6-flash', 'gemini-1.5-pro': 'gemini-3.1-pro-preview', 'gemini-3-pro': 'gemini-3.1-pro-preview', 'gemini-3-pro-preview': 'gemini-3.1-pro-preview', 'gemini-3.5-pro': 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview': 'gemini-3.1-flash-lite'};m=String(m||'').trim().replace(/^models\//,'');return r[m]||m;}
+
 (function(){
 "use strict";
 function $(id){ return document.getElementById(id); }
@@ -1831,7 +1834,7 @@ function initTabs(){
 var AI_PROVIDERS = {
   claude:{ label:"Claude", defaultModel:"claude-sonnet-5-5" },
   openai:{ label:"OpenAI", defaultModel:"gpt-5.1" },
-  gemini:{ label:"Gemini", defaultModel:"gemini-3-pro" },
+  gemini:{ label:"Gemini", defaultModel:"gemini-3.6-flash" },
   openrouter:{ label:"OpenRouter", defaultModel:"anthropic/claude-sonnet-5.5" }
 };
 var AI_CONFIG_KEY = "pdrfmApiConfig";
@@ -1879,7 +1882,7 @@ async function callLLM(provider, model, apiKey, prompt, onRetry){
       return t;
     };
   } else if(provider === "gemini"){
-    url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
+    url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(geminiModelFix(model)) + ":generateContent";
     headers = {"content-type":"application/json","x-goog-api-key":apiKey};
     body = {contents:[{parts:[{text:prompt}]}]};
     extract = function(d){
